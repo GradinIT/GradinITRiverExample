@@ -49,13 +49,56 @@ CLI="$(jar_of platform-cli)"
 
 main_class() {
   local jar="$1"
-  local main
-  main="$(unzip -p "$jar" META-INF/MANIFEST.MF | tr -d '\r' | awk '/^Main-Class:/{print $2; exit}')"
-  if [[ -z "$main" ]]; then
-    echo "Ingen Main-Class i $jar" >&2
-    exit 1
-  fi
-  printf '%s\n' "$main"
+  local classpath="$2"
+  python3 - "$jar" "$classpath" << 'PY'
+import sys, zipfile
+jar, classpath = sys.argv[1], sys.argv[2]
+
+def manifest_main(path):
+    try:
+        with zipfile.ZipFile(path) as zf:
+            text = zf.read("META-INF/MANIFEST.MF").decode("utf-8", "replace")
+    except KeyError:
+        return None
+    for line in text.replace("\r", "").split("\n"):
+        if line.startswith("Main-Class:"):
+            return line.split(":", 1)[1].strip()
+    return None
+
+def has_main(data):
+    return b"main" in data and b"([Ljava/lang/String;)V" in data and data[:4] == b"\xca\xfe\xba\xbe"
+
+def mains(path):
+    found = []
+    with zipfile.ZipFile(path) as zf:
+        for name in zf.namelist():
+            if name.endswith(".class") and "$" not in name and not name.startswith("META-INF/versions/"):
+                if has_main(zf.read(name)):
+                    found.append(name[:-6].replace("/", "."))
+    return found
+
+chosen = manifest_main(jar) or ""
+if not chosen:
+    own = mains(jar)
+    chosen = next(iter(own), "")
+if not chosen:
+    for entry in classpath.split(":"):
+        if not entry.endswith(".jar"):
+            continue
+        try:
+            names = mains(entry)
+        except OSError:
+            continue
+        for name in names:
+            if name.startswith("se.gradinit.river.platform.bootstrap.") or name == "com.sun.jini.start.ServiceStarter":
+                chosen = name
+                break
+        if chosen:
+            break
+if not chosen:
+    sys.exit("Ingen startklass i " + jar)
+print(chosen)
+PY
 }
 
 echo "Bygger exemplet"
@@ -67,8 +110,8 @@ if [[ ! -s "$PLATFORM_CP_FILE" ]]; then
   exit 1
 fi
 PLATFORM_CP="$(tr -d '\n' < "$PLATFORM_CP_FILE")"
-BOOT_MAIN="$(main_class "$BOOTSTRAP")"
-CLI_MAIN="$(main_class "$CLI")"
+BOOT_MAIN="$(main_class "$BOOTSTRAP" "$PLATFORM_CP")"
+CLI_MAIN="$(main_class "$CLI" "$PLATFORM_CP")"
 
 CUSTOMER="$ROOT/customer-component/target/customer-component-1.0.0.jar"
 ORDER="$ROOT/order-component/target/order-component-1.0.0.jar"

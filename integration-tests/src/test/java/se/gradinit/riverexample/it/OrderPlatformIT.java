@@ -4,13 +4,18 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.jar.JarFile;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -58,8 +63,10 @@ class OrderPlatformIT {
         Files.createDirectories(logs);
         List<String> jvm = jvmFlags(compatJar);
         String platformClasspath = platformClasspath();
-        String bootstrapMain = mainClass(bootstrapJar);
-        String cliMain = mainClass(cliJar);
+        String bootstrapMain = mainClass(bootstrapJar, platformClasspath);
+        String cliMain = mainClass(cliJar, platformClasspath);
+        System.out.println("BOOTSTRAP_MAIN " + bootstrapMain);
+        System.out.println("CLI_MAIN " + cliMain);
 
         Path bootstrapLog = logs.resolve("bootstrap.log");
         bootstrap = start(bootstrapLog, repoRoot, jvm, "-cp", platformClasspath, bootstrapMain);
@@ -130,12 +137,154 @@ class OrderPlatformIT {
         return classpath;
     }
 
-    private static String mainClass(Path jar) throws IOException {
+    private static String mainClass(Path jar, String classpath) throws IOException {
+        String fromManifest = manifestMain(jar);
+        if (fromManifest != null) {
+            return fromManifest;
+        }
+        List<String> inJar = mainsIn(jar);
+        if (!inJar.isEmpty()) {
+            return preferMain(inJar);
+        }
+        List<String> platformMains = new ArrayList<>();
+        for (String entry : classpath.split(System.getProperty("path.separator"))) {
+            Path candidate = Path.of(entry);
+            if (!Files.isRegularFile(candidate) || !candidate.getFileName().toString().endsWith(".jar")) {
+                continue;
+            }
+            for (String name : mainsIn(candidate)) {
+                if (name.startsWith("se.gradinit.river.platform.bootstrap.")
+                        || name.equals("com.sun.jini.start.ServiceStarter")) {
+                    platformMains.add(name);
+                }
+            }
+        }
+        assertTrue(!platformMains.isEmpty(), "ingen startklass i " + jar + " eller på plattformens klassökväg");
+        return preferMain(platformMains);
+    }
+
+    private static String manifestMain(Path jar) throws IOException {
         try (JarFile file = new JarFile(jar.toFile())) {
             var manifest = file.getManifest();
-            String main = manifest == null ? null : manifest.getMainAttributes().getValue("Main-Class");
-            assertTrue(main != null && !main.isBlank(), "ingen Main-Class i " + jar);
-            return main.trim();
+            if (manifest == null) {
+                return null;
+            }
+            String main = manifest.getMainAttributes().getValue("Main-Class");
+            return main == null || main.isBlank() ? null : main.trim();
+        }
+    }
+
+    private static String preferMain(List<String> names) {
+        return names.stream()
+                .min(Comparator.comparingInt(OrderPlatformIT::mainRank))
+                .orElseThrow();
+    }
+
+    private static int mainRank(String name) {
+        if (name.startsWith("se.gradinit.river.platform.bootstrap.")) {
+            return 0;
+        }
+        if (name.endsWith("Bootstrap") || name.endsWith("Main")) {
+            return 1;
+        }
+        if (name.equals("com.sun.jini.start.ServiceStarter")) {
+            return 2;
+        }
+        return 3;
+    }
+
+    private static List<String> mainsIn(Path jar) throws IOException {
+        List<String> found = new ArrayList<>();
+        try (JarFile file = new JarFile(jar.toFile())) {
+            var entries = file.entries();
+            while (entries.hasMoreElements()) {
+                JarEntry entry = entries.nextElement();
+                String name = entry.getName();
+                if (!name.endsWith(".class") || name.contains("$") || name.startsWith("META-INF/versions/")) {
+                    continue;
+                }
+                try (InputStream in = file.getInputStream(entry)) {
+                    if (hasPublicStaticMain(in.readAllBytes())) {
+                        found.add(name.substring(0, name.length() - ".class".length()).replace('/', '.'));
+                    }
+                } catch (RuntimeException ignored) {
+                    // skip a class file the scanner cannot parse
+                }
+            }
+        }
+        return found;
+    }
+
+    private static boolean hasPublicStaticMain(byte[] bytes) {
+        if (bytes.length < 24 || (bytes[0] & 0xff) != 0xca || (bytes[1] & 0xff) != 0xfe) {
+            return false;
+        }
+        ByteBuffer buf = ByteBuffer.wrap(bytes);
+        buf.position(8);
+        int count = buf.getShort() & 0xffff;
+        String[] utf8 = new String[count];
+        for (int i = 1; i < count; i++) {
+            int tag = buf.get() & 0xff;
+            switch (tag) {
+                case 1 -> {
+                    int len = buf.getShort() & 0xffff;
+                    byte[] data = new byte[len];
+                    buf.get(data);
+                    utf8[i] = new String(data, StandardCharsets.UTF_8);
+                }
+                case 7, 8, 16, 19, 20 -> buf.getShort();
+                case 15 -> {
+                    buf.get();
+                    buf.getShort();
+                }
+                case 3, 4, 9, 10, 11, 12, 17, 18 -> buf.getInt();
+                case 5, 6 -> {
+                    buf.getLong();
+                    i++;
+                }
+                default -> {
+                    return false;
+                }
+            }
+        }
+        buf.getShort();
+        buf.getShort();
+        buf.getShort();
+        int interfaces = buf.getShort() & 0xffff;
+        buf.position(buf.position() + interfaces * 2);
+        int fields = buf.getShort() & 0xffff;
+        for (int i = 0; i < fields; i++) {
+            skipMember(buf);
+        }
+        int methods = buf.getShort() & 0xffff;
+        for (int i = 0; i < methods; i++) {
+            int access = buf.getShort() & 0xffff;
+            int nameIndex = buf.getShort() & 0xffff;
+            int descIndex = buf.getShort() & 0xffff;
+            skipAttributes(buf);
+            if ((access & 0x0001) != 0
+                    && (access & 0x0008) != 0
+                    && "main".equals(utf8[nameIndex])
+                    && "([Ljava/lang/String;)V".equals(utf8[descIndex])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void skipMember(ByteBuffer buf) {
+        buf.getShort();
+        buf.getShort();
+        buf.getShort();
+        skipAttributes(buf);
+    }
+
+    private static void skipAttributes(ByteBuffer buf) {
+        int attributes = buf.getShort() & 0xffff;
+        for (int i = 0; i < attributes; i++) {
+            buf.getShort();
+            int length = buf.getInt();
+            buf.position(buf.position() + length);
         }
     }
 
