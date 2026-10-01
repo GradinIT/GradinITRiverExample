@@ -1,2 +1,2 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<component xmlns="urn:se:gradinit:river:conf" name="customer"/>
+<configuration xmlns="urn:se:gradinit:river:conf" component="customer"/>

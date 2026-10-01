@@ -20,7 +20,7 @@ Följden är att CI i det här repot bara blir grön om `develop` är publik ell
 
 SLA-formatet är bekräftat från plattformens tester: rot `component` i namnrymden `urn:se:gradinit:river:sla`, med attributen `name` och `version`, och `service` med attributen `interface`, `name`, `instances` och `mainClass`. Hello-IT:t använder samma form för tre backendar och en router.
 
-`META-INF/{namn}_conf.xml` ska namnge samma komponent och lista beroenden på gränssnitt plus `Name`. Exemplet använder namnrymden `urn:se:gradinit:river:conf` och ett `dependency`-element med attributen `interface` och `name`. Om schemats namnrymd eller elementnamn skiljer sig avvisar `river deploy` JAR-filen, och XML:en ska rättas mot plattformens `examples/` och `ComponentDescriptors`.
+`ComponentDescriptors.readConf` läser rot-elementet `configuration`. Exemplet sätter attributet `component` till samma namn som i SLA och listar beroenden som `dependency` med `interface` och `name`, i namnrymden `urn:se:gradinit:river:conf`. Namnrymden är inte läst ur källan. Om schemat använder en annan URI avvisar `river deploy` JAR-filen.
 
 ## Hjälpklasser i platform-api
 
