@@ -81,6 +81,18 @@
               <overWriteSnapshots>true</overWriteSnapshots>
             </configuration>
           </execution>
+          <execution>
+            <id>platform-classpath</id>
+            <phase>package</phase>
+            <goals>
+              <goal>build-classpath</goal>
+            </goals>
+            <configuration>
+              <outputFile>${project.build.directory}/platform-classpath.txt</outputFile>
+              <includeGroupIds>se.gradinit.river</includeGroupIds>
+              <includeScope>runtime</includeScope>
+            </configuration>
+          </execution>
         </executions>
       </plugin>
       <plugin>
@@ -97,6 +109,7 @@
             <river.bootstrap.jar>${project.build.directory}/river-jars/platform-bootstrap.jar</river.bootstrap.jar>
             <river.cli.jar>${project.build.directory}/river-jars/platform-cli.jar</river.cli.jar>
             <river.compat.jar>${project.build.directory}/river-jvm/compat-rmi-activation.jar</river.compat.jar>
+            <river.platform.classpath>${project.build.directory}/platform-classpath.txt</river.platform.classpath>
           </systemPropertyVariables>
         </configuration>
         <executions>

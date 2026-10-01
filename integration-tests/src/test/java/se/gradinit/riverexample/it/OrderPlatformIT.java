@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.jar.JarFile;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -56,16 +57,21 @@ class OrderPlatformIT {
         Path logs = repoRoot.resolve("integration-tests/target/platform-logs");
         Files.createDirectories(logs);
         List<String> jvm = jvmFlags(compatJar);
+        String platformClasspath = platformClasspath();
+        String bootstrapMain = mainClass(bootstrapJar);
+        String cliMain = mainClass(cliJar);
 
-        bootstrap = start(logs.resolve("bootstrap.log"), repoRoot, jvm, "-jar", bootstrapJar.toString());
+        Path bootstrapLog = logs.resolve("bootstrap.log");
+        bootstrap = start(bootstrapLog, repoRoot, jvm, "-cp", platformClasspath, bootstrapMain);
         Thread.sleep(Duration.ofSeconds(15).toMillis());
+        assertTrue(bootstrap.isAlive(), "bootstrap dog\n" + Files.readString(bootstrapLog));
 
-        CommandResult deployedCustomer = river(logs, repoRoot, jvm, cliJar, "deploy", customerJar.toString());
+        CommandResult deployedCustomer = river(logs, repoRoot, jvm, platformClasspath, cliMain, "deploy", customerJar.toString());
         assertEquals(0, deployedCustomer.exit, deployedCustomer.output);
-        CommandResult deployedOrder = river(logs, repoRoot, jvm, cliJar, "deploy", orderJar.toString());
+        CommandResult deployedOrder = river(logs, repoRoot, jvm, platformClasspath, cliMain, "deploy", orderJar.toString());
         assertEquals(0, deployedOrder.exit, deployedOrder.output);
 
-        CommandResult monitor = river(logs, repoRoot, jvm, cliJar, "monitor");
+        CommandResult monitor = river(logs, repoRoot, jvm, platformClasspath, cliMain, "monitor");
         assertEquals(0, monitor.exit, monitor.output);
         assertTrue(!monitor.output.isBlank(), "river monitor gav tom utdata");
 
@@ -79,14 +85,14 @@ class OrderPlatformIT {
         String backend = ok.get(0).replaceAll(".*backendId=", "");
         assertTrue(ok.get(1).endsWith("backendId=" + backend), call.output);
 
-        CommandResult undeployOrder = river(logs, repoRoot, jvm, cliJar, "undeploy", "order");
+        CommandResult undeployOrder = river(logs, repoRoot, jvm, platformClasspath, cliMain, "undeploy", "order");
         if (undeployOrder.exit != 0) {
-            undeployOrder = river(logs, repoRoot, jvm, cliJar, "undeploy", orderJar.toString());
+            undeployOrder = river(logs, repoRoot, jvm, platformClasspath, cliMain, "undeploy", orderJar.toString());
         }
         assertEquals(0, undeployOrder.exit, undeployOrder.output);
-        CommandResult undeployCustomer = river(logs, repoRoot, jvm, cliJar, "undeploy", "customer");
+        CommandResult undeployCustomer = river(logs, repoRoot, jvm, platformClasspath, cliMain, "undeploy", "customer");
         if (undeployCustomer.exit != 0) {
-            undeployCustomer = river(logs, repoRoot, jvm, cliJar, "undeploy", customerJar.toString());
+            undeployCustomer = river(logs, repoRoot, jvm, platformClasspath, cliMain, "undeploy", customerJar.toString());
         }
         assertEquals(0, undeployCustomer.exit, undeployCustomer.output);
     }
@@ -115,6 +121,24 @@ class OrderPlatformIT {
         return newest == null ? dir.resolve(artifact + "-" + version + ".jar") : newest;
     }
 
+    private static String platformClasspath() throws IOException {
+        String configured = System.getProperty("river.platform.classpath", "target/platform-classpath.txt");
+        Path file = Path.of(configured);
+        assertTrue(Files.isRegularFile(file), "saknar plattformens klassökväg " + file.toAbsolutePath());
+        String classpath = Files.readString(file).trim();
+        assertTrue(!classpath.isBlank(), "tom klassökväg i " + file);
+        return classpath;
+    }
+
+    private static String mainClass(Path jar) throws IOException {
+        try (JarFile file = new JarFile(jar.toFile())) {
+            var manifest = file.getManifest();
+            String main = manifest == null ? null : manifest.getMainAttributes().getValue("Main-Class");
+            assertTrue(main != null && !main.isBlank(), "ingen Main-Class i " + jar);
+            return main.trim();
+        }
+    }
+
     private static List<String> jvmFlags(Path compatJar) {
         return List.of(
                 "--patch-module", "java.rmi=" + compatJar,
@@ -133,10 +157,11 @@ class OrderPlatformIT {
                 .start();
     }
 
-    private static CommandResult river(Path logs, Path work, List<String> jvm, Path cliJar, String... args) throws Exception {
+    private static CommandResult river(Path logs, Path work, List<String> jvm, String classpath, String mainClass, String... args) throws Exception {
         List<String> command = new ArrayList<>();
-        command.add("-jar");
-        command.add(cliJar.toString());
+        command.add("-cp");
+        command.add(classpath);
+        command.add(mainClass);
         command.addAll(List.of(args));
         Path log = logs.resolve(String.join("-", args).replaceAll("[^a-zA-Z0-9._-]", "_") + ".log");
         return run(log, work, jvm, command.toArray(String[]::new));

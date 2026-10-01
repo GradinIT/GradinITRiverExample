@@ -16,6 +16,10 @@ GradinIT är ett personligt konto, så paket kan inte delas med det här repots 
 
 `ComponentDescriptors` i plattformen sätter `SLA_NAMESPACE` till `urn:se:gradinit:river:sla` och `CONF_NAMESPACE` till `urn:se:gradinit:river:conf`, och läser rotelementen `component` respektive `configuration`.
 
+## `java -jar` räcker inte för CLI och bootstrap
+
+`platform-cli` och `platform-bootstrap` innehåller inte Jini-klasserna. `RiverCommand` refererar `net.jini.discovery.DiscoveryManagement` i `jsk-platform`. Starta dem med `-cp` och runtime-klassökvägen för `se.gradinit.river`, inte med `-jar` ensamt.
+
 ## Läget integrity
 
 Standardläget `integrity` kräver att API-JAR, `jsk-platform` och `reggie` finns på klientens klassökväg, eller att kodbasen är `file:` eller `httpmd:`. Klientmodulen beror därför på `jsk-platform` och `reggie`.

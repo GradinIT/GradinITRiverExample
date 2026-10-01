@@ -47,8 +47,28 @@ fi
 BOOTSTRAP="$(jar_of platform-bootstrap)"
 CLI="$(jar_of platform-cli)"
 
+main_class() {
+  local jar="$1"
+  local main
+  main="$(unzip -p "$jar" META-INF/MANIFEST.MF | tr -d '\r' | awk '/^Main-Class:/{print $2; exit}')"
+  if [[ -z "$main" ]]; then
+    echo "Ingen Main-Class i $jar" >&2
+    exit 1
+  fi
+  printf '%s\n' "$main"
+}
+
 echo "Bygger exemplet"
 (cd "$ROOT" && ./mvnw -B -U -DskipITs package)
+
+PLATFORM_CP_FILE="$ROOT/integration-tests/target/platform-classpath.txt"
+if [[ ! -s "$PLATFORM_CP_FILE" ]]; then
+  echo "Saknar $PLATFORM_CP_FILE" >&2
+  exit 1
+fi
+PLATFORM_CP="$(tr -d '\n' < "$PLATFORM_CP_FILE")"
+BOOT_MAIN="$(main_class "$BOOTSTRAP")"
+CLI_MAIN="$(main_class "$CLI")"
 
 CUSTOMER="$ROOT/customer-component/target/customer-component-1.0.0.jar"
 ORDER="$ROOT/order-component/target/order-component-1.0.0.jar"
@@ -63,14 +83,14 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "Startar platform-bootstrap"
-"$JAVA" "${FLAGS[@]}" -jar "$BOOTSTRAP" >"$LOGS/bootstrap.log" 2>&1 &
+echo "Startar platform-bootstrap ($BOOT_MAIN)"
+"$JAVA" "${FLAGS[@]}" -cp "$PLATFORM_CP" "$BOOT_MAIN" >"$LOGS/bootstrap.log" 2>&1 &
 BOOT_PID=$!
 sleep 15
 
 river() {
   echo "+ river $*"
-  "$JAVA" "${FLAGS[@]}" -jar "$CLI" "$@"
+  "$JAVA" "${FLAGS[@]}" -cp "$PLATFORM_CP" "$CLI_MAIN" "$@"
 }
 
 river deploy "$CUSTOMER"
