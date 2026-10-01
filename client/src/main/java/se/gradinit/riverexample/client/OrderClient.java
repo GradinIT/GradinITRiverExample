@@ -30,14 +30,18 @@ public final class OrderClient {
         try {
             ServiceTemplate template = ServiceLookup.template(OrderService.class, "order");
             ServiceItem item = manager.lookup(template, null, Duration.ofSeconds(30).toMillis());
-            if (item == null) {
+            OrderService orders = item != null && item.service instanceof OrderService service ? service : null;
+            if (orders == null) {
                 ServiceRegistrar registrar = ServiceLookup.awaitRegistrar(discovery, Duration.ofSeconds(30));
-                item = registrar.lookup(template);
+                // lookup(ServiceTemplate) returns the proxy, not a ServiceItem.
+                Object found = registrar.lookup(template);
+                if (found instanceof OrderService service) {
+                    orders = service;
+                }
             }
-            if (item == null || item.service == null) {
+            if (orders == null) {
                 throw new IllegalStateException("Hittade inte OrderService name=order");
             }
-            OrderService orders = (OrderService) item.service;
             OrderConfirmation first = orders.place(request);
             OrderConfirmation second = orders.place(request);
             System.out.println(format(first));
