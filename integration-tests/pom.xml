@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>se.gradinit.riverexample</groupId>
+    <artifactId>gradinit-river-example</artifactId>
+    <version>1.0.0</version>
+  </parent>
+  <artifactId>integration-tests</artifactId>
+  <name>integration-tests</name>
+
+  <dependencies>
+    <dependency>
+      <groupId>se.gradinit.riverexample</groupId>
+      <artifactId>customer-component</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>se.gradinit.riverexample</groupId>
+      <artifactId>order-component</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>se.gradinit.riverexample</groupId>
+      <artifactId>client</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>se.gradinit.river</groupId>
+      <artifactId>platform-bootstrap</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>se.gradinit.river</groupId>
+      <artifactId>platform-cli</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>se.gradinit.river</groupId>
+      <artifactId>jsk-platform</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>se.gradinit.river</groupId>
+      <artifactId>reggie</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-failsafe-plugin</artifactId>
+        <configuration>
+          <includes>
+            <include>**/*IT.java</include>
+          </includes>
+          <forkedProcessTimeoutInSeconds>600</forkedProcessTimeoutInSeconds>
+          <argLine>--patch-module java.rmi=${settings.localRepository}/se/gradinit/river/compat-rmi-activation/${gradinit.river.version}/compat-rmi-activation-${gradinit.river.version}.jar --add-exports java.rmi/java.rmi.activation=ALL-UNNAMED</argLine>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>integration-test</goal>
+              <goal>verify</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

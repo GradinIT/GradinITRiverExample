@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>se.gradinit.riverexample</groupId>
+  <artifactId>gradinit-river-example</artifactId>
+  <version>1.0.0</version>
+  <packaging>pom</packaging>
+
+  <name>GradinITRiver example</name>
+  <description>Fristående exempel som använder GradinITRiver som vanliga Maven-beroenden.</description>
+
+  <properties>
+    <!-- Pinna mot den version som GradinITRiver@develop installerar (se.gradinit.river:gradinit-river). -->
+    <gradinit.river.version>3.0.0-gradinit</gradinit.river.version>
+    <maven.compiler.release>25</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <junit.version>5.11.4</junit.version>
+  </properties>
+
+  <modules>
+    <module>example-support</module>
+    <module>customer-api</module>
+    <module>customer-component</module>
+    <module>order-api</module>
+    <module>order-component</module>
+    <module>client</module>
+    <module>integration-tests</module>
+  </modules>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>se.gradinit.river</groupId>
+        <artifactId>platform-api</artifactId>
+        <version>${gradinit.river.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>se.gradinit.river</groupId>
+        <artifactId>platform-cli</artifactId>
+        <version>${gradinit.river.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>se.gradinit.river</groupId>
+        <artifactId>platform-bootstrap</artifactId>
+        <version>${gradinit.river.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>se.gradinit.river</groupId>
+        <artifactId>platform-deployer</artifactId>
+        <version>${gradinit.river.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>se.gradinit.river</groupId>
+        <artifactId>platform-supervisor</artifactId>
+        <version>${gradinit.river.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>se.gradinit.river</groupId>
+        <artifactId>jsk-platform</artifactId>
+        <version>${gradinit.river.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>se.gradinit.river</groupId>
+        <artifactId>reggie</artifactId>
+        <version>${gradinit.river.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>se.gradinit.river</groupId>
+        <artifactId>compat-rmi-activation</artifactId>
+        <version>${gradinit.river.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>se.gradinit.riverexample</groupId>
+        <artifactId>example-support</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>se.gradinit.riverexample</groupId>
+        <artifactId>customer-api</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>se.gradinit.riverexample</groupId>
+        <artifactId>order-api</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter</artifactId>
+        <version>${junit.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <argLine>--patch-module java.rmi=${settings.localRepository}/se/gradinit/river/compat-rmi-activation/${gradinit.river.version}/compat-rmi-activation-${gradinit.river.version}.jar --add-exports java.rmi/java.rmi.activation=ALL-UNNAMED</argLine>
+        </configuration>
+      </plugin>
+    </plugins>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>3.14.0</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-jar-plugin</artifactId>
+          <version>3.4.2</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-shade-plugin</artifactId>
+          <version>3.6.0</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <version>3.5.2</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-failsafe-plugin</artifactId>
+          <version>3.5.2</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
+</project>

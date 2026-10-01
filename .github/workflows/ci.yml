@@ -1,0 +1,40 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        java: ["25", "26"]
+    steps:
+      - name: Hämta exemplet
+        uses: actions/checkout@v4
+
+      - name: JDK ${{ matrix.java }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+
+      # GradinITRiver publiceras inte. CI bygger develop och installerar JAR-filer
+      # lokalt innan exemplet kompileras. Publik repo behöver ingen token.
+      # Privat repo: lägg en PAT med contents:read i hemligheten GRADINIT_RIVER_TOKEN.
+      - name: Hämta GradinITRiver@develop
+        uses: actions/checkout@v4
+        with:
+          repository: GradinIT/GradinITRiver
+          ref: develop
+          path: .upstream/GradinITRiver
+          token: ${{ secrets.GRADINIT_RIVER_TOKEN || github.token }}
+
+      - name: Installera GradinITRiver
+        working-directory: .upstream/GradinITRiver
+        run: ./mvnw -B install -DskipTests
+
+      - name: Bygg och testa exemplet
+        run: ./mvnw -B verify

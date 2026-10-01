@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component xmlns="urn:se:gradinit:river:conf" name="order">
+  <dependency interface="se.gradinit.riverexample.customer.CustomerService" name="customer"/>
+</component>

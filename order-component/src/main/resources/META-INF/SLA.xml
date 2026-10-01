@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component xmlns="urn:se:gradinit:river:sla" name="order" version="1.0.0">
+  <service interface="se.gradinit.riverexample.order.OrderService"
+           name="order-backend"
+           instances="3"
+           mainClass="se.gradinit.riverexample.order.OrderBackendMain"/>
+  <service interface="se.gradinit.riverexample.order.OrderService"
+           name="order"
+           instances="1"
+           mainClass="se.gradinit.riverexample.order.OrderRouterMain"/>
+</component>
