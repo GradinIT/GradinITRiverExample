@@ -147,20 +147,33 @@ class OrderPlatformIT {
             return preferMain(inJar);
         }
         List<String> platformMains = new ArrayList<>();
+        List<String> everyMain = new ArrayList<>();
         for (String entry : classpath.split(System.getProperty("path.separator"))) {
             Path candidate = Path.of(entry);
             if (!Files.isRegularFile(candidate) || !candidate.getFileName().toString().endsWith(".jar")) {
                 continue;
             }
             for (String name : mainsIn(candidate)) {
-                if (name.startsWith("se.gradinit.river.platform.bootstrap.")
-                        || name.equals("com.sun.jini.start.ServiceStarter")) {
+                everyMain.add(candidate.getFileName() + " " + name);
+                if (name.contains(".bootstrap.")
+                        || name.endsWith(".ServiceStarter")
+                        || name.endsWith("Bootstrap")
+                        || name.contains(".start.ServiceStarter")) {
                     platformMains.add(name);
                 }
             }
         }
-        assertTrue(!platformMains.isEmpty(), "ingen startklass i " + jar + " eller på plattformens klassökväg");
-        return preferMain(platformMains);
+        if (!platformMains.isEmpty()) {
+            return preferMain(platformMains);
+        }
+        List<String> entries = new ArrayList<>();
+        try (JarFile file = new JarFile(jar.toFile())) {
+            file.stream().limit(60).forEach(item -> entries.add(item.getName()));
+        }
+        assertTrue(false, "ingen startklass i " + jar
+                + "\nentries=" + entries
+                + "\nmains=" + everyMain);
+        return "";
     }
 
     private static String manifestMain(Path jar) throws IOException {
