@@ -2,15 +2,20 @@ package se.gradinit.riverexample.order;
 
 import java.rmi.RemoteException;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import net.jini.core.lookup.ServiceID;
 import net.jini.core.lookup.ServiceItem;
 import se.gradinit.river.platform.annotation.ExportedService;
-import se.gradinit.riverexample.support.Hrw;
+import se.gradinit.river.platform.routing.HrwSelector;
+import se.gradinit.river.platform.routing.RoutingKeys;
 import se.gradinit.riverexample.support.ServiceLookup;
 
 /**
- * Client-facing {@link OrderService}. Picks one of the backend instances with HRW
- * on the {@code @Routing} customer id.
+ * Client-facing {@link OrderService}. Picks one backend with the platform HRW
+ * selector on the {@code @Routing} field of {@link OrderRequest}.
  */
 @ExportedService(name = "order", remoteInterface = OrderService.class)
 public class OrderRouter implements OrderService {
@@ -21,15 +26,23 @@ public class OrderRouter implements OrderService {
         }
         try {
             List<ServiceItem> backends = ServiceLookup.findAll(OrderService.class, "order-backend", Duration.ofSeconds(20));
-            if (backends.isEmpty()) {
+            Map<ServiceID, ServiceItem> byId = new LinkedHashMap<>();
+            for (ServiceItem item : backends) {
+                if (item.serviceID != null && item.service != null) {
+                    byId.put(item.serviceID, item);
+                }
+            }
+            if (byId.isEmpty()) {
                 throw new RemoteException("inga order-backend registrerade");
             }
-            ServiceItem chosen = Hrw.choose(
-                    request.customerId(),
-                    backends,
-                    item -> item.serviceID == null ? item.service.toString() : item.serviceID.toString());
+            byte[] routingKey = RoutingKeys.canonicalBytes(request);
+            ServiceID chosenId = HrwSelector.select(routingKey, new ArrayList<>(byId.keySet()));
+            ServiceItem chosen = chosenId == null ? null : byId.get(chosenId);
+            if (chosen == null) {
+                throw new RemoteException("HRW valde ingen backend");
+            }
             OrderService backend = (OrderService) chosen.service;
-            System.out.println("ROUTE customer=" + request.customerId() + " backends=" + backends.size());
+            System.out.println("ROUTE customer=" + request.customerId() + " backends=" + byId.size());
             return backend.place(request);
         } catch (RemoteException e) {
             throw e;

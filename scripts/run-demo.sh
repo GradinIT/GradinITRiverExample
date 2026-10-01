@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-VERSION="${GRADINIT_RIVER_VERSION:-3.0.0-gradinit}"
+VERSION="${GRADINIT_RIVER_VERSION:-3.0.0-gradinit-SNAPSHOT}"
 REPO="${M2_REPO:-${MAVEN_REPO_LOCAL:-$HOME/.m2/repository}}"
 RIVER="$REPO/se/gradinit/river"
 LOGS="$ROOT/target/demo-logs"
@@ -11,13 +11,31 @@ mkdir -p "$LOGS"
 
 jar_of() {
   local artifact="$1"
-  local jar="$RIVER/${artifact}/${VERSION}/${artifact}-${VERSION}.jar"
-  if [[ ! -f "$jar" ]]; then
-    echo "Saknar $jar" >&2
-    echo "Kör först: ./scripts/install-gradinit-river.sh" >&2
+  local dir="$RIVER/${artifact}/${VERSION}"
+  local newest=""
+  local newest_time=0
+  shopt -s nullglob
+  for jar in "$dir"/${artifact}-*.jar; do
+    case "$jar" in
+      *-sources.jar|*-javadoc.jar|*-tests.jar) continue ;;
+    esac
+    local mtime
+    if mtime=$(stat -c %Y "$jar" 2>/dev/null); then
+      :
+    else
+      mtime=$(stat -f %m "$jar")
+    fi
+    if (( mtime > newest_time )); then
+      newest="$jar"
+      newest_time=$mtime
+    fi
+  done
+  if [[ -z "$newest" ]]; then
+    echo "Saknar ${artifact} ${VERSION} under ${dir}." >&2
+    echo "Konfigurera GitHub Packages (server-id github) och kör ./mvnw -B -U package. Se docs/beroenden.md." >&2
     exit 1
   fi
-  printf '%s\n' "$jar"
+  printf '%s\n' "$newest"
 }
 
 mapfile -t FLAGS < <("$ROOT/scripts/river-jvm-flags.sh")
@@ -30,7 +48,7 @@ BOOTSTRAP="$(jar_of platform-bootstrap)"
 CLI="$(jar_of platform-cli)"
 
 echo "Bygger exemplet"
-(cd "$ROOT" && ./mvnw -B -DskipITs package)
+(cd "$ROOT" && ./mvnw -B -U -DskipITs package)
 
 CUSTOMER="$ROOT/customer-component/target/customer-component-1.0.0.jar"
 ORDER="$ROOT/order-component/target/order-component-1.0.0.jar"

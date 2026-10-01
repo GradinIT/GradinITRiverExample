@@ -4,7 +4,7 @@ En komponent är en JAR med klasser märkta `@ExportedService`, `META-INF/SLA.xm
 
 `customer` har en instans av `CustomerService` med namnet `customer`. Den har inga beroenden.
 
-`order` har tre backend-instanser (`OrderService`, namn `order-backend`, roll `backend`) och en router (`OrderService`, namn `order`, roll `router`). `order_conf.xml` pekar på `CustomerService` + `customer`. Routern väljer backend med HRW på posten `customerId`, som är märkt `@Routing`. Backend slår upp kunden och skapar ordern.
+`order` har tre backend-instanser (`OrderService`, namn `order-backend`) och en router (`OrderService`, namn `order`). `order_conf.xml` pekar på `CustomerService` + `customer`. Routern väljer backend med `HrwSelector.select` på `RoutingKeys.canonicalBytes` av `OrderRequest`. Fältet `customerId` är märkt `@Routing`. Backend slår upp kunden och skapar ordern. Exporten går genom `ServiceExporter.joinAnnotated`, och ServiceID sparas med `ServiceIdFile`.
 
 Klientens mall är `OrderService` + `Name("order")`, alltså routern, inte en enstaka backend.
 

@@ -1,62 +1,65 @@
 # Beroenden mot GradinITRiver
 
-Exemplet kompilerar mot GradinITRivers JAR-filer. Källkod kopieras inte hit.
+Exemplet kompilerar mot GradinITRivers JAR-filer från GitHub Packages. Källkod kopieras inte hit, och repot checkas inte ut i CI.
 
 ## Pin
 
 Versionen ligger i rotens `pom.xml`:
 
 ```xml
-<gradinit.river.version>3.0.0-gradinit</gradinit.river.version>
+<gradinit.river.version>3.0.0-gradinit-SNAPSHOT</gradinit.river.version>
 ```
 
-Den ska matcha `se.gradinit.river:gradinit-river` på grenen `develop`. Moduler som exemplet använder:
+Push till `develop` i GradinITRiver publicerar `3.0.0-gradinit-SNAPSHOT`. Taggen `v3.0.0-gradinit` publicerar releasen `3.0.0-gradinit`. Byt propertyn när du vill bygga mot releasen.
 
-| artifactId | Roll |
+Beroendena importeras från `se.gradinit.river:gradinit-river-bom`. Repot i `pom.xml` har id `github` och URL `https://maven.pkg.github.com/GradinIT/GradinITRiver`.
+
+Publicerade artefakter, med sources- och javadoc-JAR:
+
+| artifactId | Roll här |
 | --- | --- |
-| `platform-api` | `@ExportedService`, `@Routing`, descriptor-typer |
+| `gradinit-river` | föräldra-POM |
+| `gradinit-river-bom` | versioner |
+| `platform-api` | `@ExportedService`, `@Routing`, `ServiceExporter`, `ServiceIdFile`, `HrwSelector`, `RoutingKeys` |
 | `platform-bootstrap` | startar plattformen, bland annat Reggie |
 | `platform-cli` | `river deploy`, `undeploy`, `list`, `status`, `monitor` |
-| `platform-deployer` | läser SLA och konfiguration (transitivt via bootstrap) |
+| `platform-deployer` | läser SLA och konfiguration |
 | `platform-supervisor` | startar om instanser med samma ServiceID |
-| `jsk-platform` | Jini/JERI, krävs på klientens klassökväg i läget `integrity` |
-| `reggie` | lookup-tjänsten, samma krav i läget `integrity` |
 | `compat-rmi-activation` | patch för `java.rmi` på JDK 17+ |
+| `jsk-platform`, `jsk-resources`, `jsk-lib`, `jsk-dl` | Jini/JERI |
+| `start`, `reggie`, `mahalo`, `outrigger`, `norm`, `mercury`, `fiddler`, `phoenix` | River-tjänster |
+| `river-extra` | extra River-stöd |
 
-## a) Lokal installation från `develop` (det här repot)
+## Lokal `settings.xml`
 
-Artefakterna finns inte på Maven Central. CI och lokal utveckling bygger därför GradinITRiver och installerar JAR-filerna i det lokala Maven-repot innan exemplet byggs.
+GitHub Packages kräver autentisering även för läsning. Lägg detta i `~/.m2/settings.xml`. `<id>` ska vara `github`, samma id som `<repository>` i `pom.xml`.
 
-Lokalt:
-
-```bash
-./scripts/install-gradinit-river.sh
-./mvnw -B verify
+```xml
+<settings>
+  <servers>
+    <server>
+      <id>github</id>
+      <username>DITT_GITHUB_ANVÄNDARNAMN</username>
+      <password>TOKEN_MED_read:packages</password>
+    </server>
+  </servers>
+</settings>
 ```
 
-Skriptet klonar `https://github.com/GradinIT/GradinITRiver.git` på `develop` till `.upstream/GradinITRiver` och kör `./mvnw -B install -DskipTests`. Miljövariablerna `GRADINIT_RIVER_URL`, `GRADINIT_RIVER_REF` och `GRADINIT_RIVER_SRC` kan peka om källan.
+Token är en classic personal access token med scope `read:packages` (samma sorts token som hemligheten `GRADINIT_PACKAGES_TOKEN`). Användarnamnet är GitHub-kontot som äger token. För de här paketen är det `GradinIT`.
 
-CI gör samma sak: [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) checkar ut `GradinIT/GradinITRiver@develop` och installerar innan `./mvnw -B verify`. Bygget körs på JDK 25 och JDK 26.
+Kontrollera upplösningen:
 
-Det här är den robusta vägen så länge plattformen inte publicerar versionerade artefakter. Nackdelen är att exemplet bara byggs om `develop` går att läsa. Ett privat repo kräver hemligheten `GRADINIT_RIVER_TOKEN` (en PAT med `contents: read`). Utan den använder workflowen `github.token`, som bara läser publika repon.
+```bash
+./mvnw -B -U dependency:resolve
+```
 
-## b) JitPack
+## Actions i det här repot
 
-JitPack kan bygga ett GitHub-repo utan att artefakterna publiceras i förväg. Det passar dåligt här:
+GradinIT är ett personligt konto. Då finns inte **Manage Actions access** per paket, och `GITHUB_TOKEN` från det här repot kan inte läsa `https://maven.pkg.github.com/GradinIT/GradinITRiver`.
 
-- förälderns koordinater är `se.gradinit.river:gradinit-river:3.0.0-gradinit`, inte JitPacks `com.github.GradinIT:GradinITRiver`
-- bygget är multi-modul och behöver egna JVM-flaggor för tester
-- ett privat repo kräver en JitPack-token, och `develop` rör sig utan en oföränderlig version
+CI skriver därför en `settings.xml` med server-id `github`, användarnamn `GradinIT` (kontot som äger token; `${{ github.actor }}` fungerar när den som startar jobbet är samma konto) och lösenord `${{ secrets.GRADINIT_PACKAGES_TOKEN }}`. Hemligheten ska vara en classic PAT med `read:packages`. Workflowen finns i [`.github/workflows/ci.yml`](../.github/workflows/ci.yml).
 
-Därför används inte JitPack.
+## JitPack
 
-## c) Rekommendation: GitHub Packages
-
-Det här repot ändrar inte GradinITRiver. Rekommendationen till plattformsrepot är att publicera modulerna till GitHub Packages när `develop` byggs grönt:
-
-- `distributionManagement` mot `https://maven.pkg.github.com/GradinIT/GradinITRiver`
-- ett workflow som kör `./mvnw -B deploy -DskipTests` med `GITHUB_TOKEN` och scope `packages: write`
-- behåll `groupId` `se.gradinit.river` och versionen `3.0.0-gradinit` tills en release-version klipps
-- publicera åtminstone `platform-api`, `platform-bootstrap`, `platform-cli`, `platform-deployer`, `platform-supervisor`, `jsk-platform`, `reggie` och `compat-rmi-activation`
-
-Då kan exemplet byta ut checkout-steget mot en `repository` i `pom.xml` och fortsätta peka på `gradinit.river.version`. Konsumenter behöver fortfarande läsrättighet till paketen om de är privata.
+JitPack används inte. Förälderns koordinater är `se.gradinit.river:gradinit-river`, bygget är multi-modul, och versionen ska vara den som GitHub Packages publicerar.

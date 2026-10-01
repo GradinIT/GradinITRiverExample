@@ -1,30 +1,20 @@
 # Sådant som försvårar extern användning av GradinITRiver
 
-Det här är iakttagelser från att bygga ett fristående repo mot plattformen. Inget av det är ändrat i GradinITRiver.
+## Paketen kräver en PAT
 
-## Artefakterna publiceras inte
+`3.0.0-gradinit-SNAPSHOT` publiceras till `https://maven.pkg.github.com/GradinIT/GradinITRiver` (server-id `github`). Taggen `v3.0.0-gradinit` publicerar `3.0.0-gradinit`.
 
-`se.gradinit.river` finns inte på Maven Central. Ett konsumentrepo kan inte skriva ett vanligt beroende och låta Maven lösa det, förrän någon har kört `install` eller `deploy`. Rekommendationen är GitHub Packages, beskriven i [beroenden.md](beroenden.md).
-
-## Repot är inte läsbart med vanlig checkout
-
-`https://github.com/GradinIT/GradinITRiver` svarar 404 för både anonym läsning och den token som kan läsa `GradinITRiverExample` (contents-API, git clone och råfiler). Kodindexet har ändå träffar på `develop`, med version `3.0.0-gradinit` och förälder `se.gradinit.river:gradinit-river`. Antingen är repot privat, eller så är det inte delat med den här installationen.
-
-Följden är att CI i det här repot bara blir grön om `develop` är publik eller om `GRADINIT_RIVER_TOKEN` har läsrättighet. Utan det faller checkout-steget.
+GradinIT är ett personligt konto, så paket kan inte delas med det här repots `GITHUB_TOKEN` via Manage Actions access. CI och lokal utveckling använder en classic PAT med `read:packages`: hemligheten `GRADINIT_PACKAGES_TOKEN` i Actions, och samma token i `~/.m2/settings.xml` lokalt. Se [beroenden.md](beroenden.md).
 
 ## JVM-flaggor krävs
 
-`--patch-module java.rmi=...` och `--add-exports java.rmi/java.rmi.activation=ALL-UNNAMED` behövs på JDK 25 och 26. De kommer från `compat-rmi-activation` och är lätta att missa om man bara lägger plattformen på klassökvägen.
+`--patch-module java.rmi=...` och `--add-exports java.rmi/java.rmi.activation=ALL-UNNAMED` behövs på JDK 25 och 26. De kommer från `compat-rmi-activation`. SNAPSHOT-jaren i det lokala repot är tidsstämplade, så sökvägen kan inte hårdkodas mot `artifact-3.0.0-gradinit-SNAPSHOT.jar`.
 
-## Konfigurationsnamnrymden är inte med i de fragment som gick att läsa
+## SLA och konfiguration
 
-SLA-formatet är bekräftat från plattformens tester: rot `component` i namnrymden `urn:se:gradinit:river:sla`, med attributen `name` och `version`, och `service` med attributen `interface`, `name`, `instances` och `mainClass`. Hello-IT:t använder samma form för tre backendar och en router.
+`META-INF/SLA.xml` har namnrymden `urn:se:gradinit:river:sla` och rotelementet `component`. `META-INF/{namn}_conf.xml` har namnrymden `urn:se:gradinit:river:conf` och rotelementet `configuration`.
 
-`ComponentDescriptors.readConf` läser rot-elementet `configuration`. Exemplet sätter attributet `component` till samma namn som i SLA och listar beroenden som `dependency` med `interface` och `name`, i namnrymden `urn:se:gradinit:river:conf`. Namnrymden är inte läst ur källan. Om schemat använder en annan URI avvisar `river deploy` JAR-filen.
-
-## Hjälpklasser i platform-api
-
-`ServiceExporter`, `ServiceIdFile`, `RoutingKeys` och HRW ligger i `platform-api`. Hello-exemplet exporterar enligt dokumentationen med `BasicJeriExporter` och `JoinManager`, och det gör det här exemplet också. HRW-valet görs i `example-support` på fältet som är märkt `@Routing`, eftersom den exakta hjälpmetoden inte finns i en publicerad javadoc. När signaturen är känd bör routern anropa plattformens HRW i stället för den lokala CRC32-varianten.
+`ComponentDescriptors` i plattformen sätter `SLA_NAMESPACE` till `urn:se:gradinit:river:sla` och `CONF_NAMESPACE` till `urn:se:gradinit:river:conf`, och läser rotelementen `component` respektive `configuration`.
 
 ## Läget integrity
 

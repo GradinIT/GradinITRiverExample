@@ -1,58 +1,77 @@
 package se.gradinit.riverexample.support;
 
-import java.rmi.Remote;
+import java.nio.file.Path;
 import net.jini.core.entry.Entry;
 import net.jini.core.lookup.ServiceID;
-import net.jini.discovery.DiscoveryManagement;
-import net.jini.export.Exporter;
+import net.jini.discovery.LookupDiscoveryManager;
 import net.jini.jeri.BasicILFactory;
 import net.jini.jeri.BasicJeriExporter;
 import net.jini.jeri.tcp.TcpServerEndpoint;
-import net.jini.lookup.JoinManager;
-import net.jini.lookup.entry.Name;
+import se.gradinit.river.platform.export.ServiceExporter;
+import se.gradinit.river.platform.identity.ServiceIdFile;
 
 /**
- * Exports a remote object with {@link BasicJeriExporter}, joins Reggie through
- * {@link JoinManager} and renews the lease for the life of the process.
+ * Exports an {@code @ExportedService} with {@link ServiceExporter#joinAnnotated}.
+ * The platform persists the Jini {@link ServiceID} via {@link ServiceIdFile}.
  */
 public final class ServiceHost {
+    private static final long LOOKUP_WAIT_MILLIS = 60_000L;
+
     private ServiceHost() {}
 
-    public static void serve(Remote implementation, String jiniName) throws Exception {
-        Exporter exporter = new BasicJeriExporter(TcpServerEndpoint.getInstance(0), new BasicILFactory(), false, false);
-        Remote proxy = exporter.export(implementation);
-        DiscoveryManagement discovery = Discovery.open();
-        PathAndId stored = new PathAndId(ServiceIds.file(jiniName));
-        ServiceID existing = ServiceIds.read(stored.path);
-        Entry[] attributes = new Entry[] {new Name(jiniName)};
-        JoinManager join = existing == null
-                ? new JoinManager(proxy, attributes, id -> persist(stored, id), discovery, null)
-                : new JoinManager(proxy, attributes, existing, discovery, null);
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            try {
-                join.terminate();
-            } catch (RuntimeException ignored) {
-                // process is exiting
-            }
-            discovery.terminate();
-            try {
-                exporter.unexport(true);
-            } catch (RuntimeException ignored) {
-                // process is exiting
-            }
-        }));
-        System.out.println("EXPORTED name=" + jiniName + " class=" + implementation.getClass().getName());
+    public static void serve(Object implementation) throws Exception {
+        ServiceExporter.requireExported(implementation);
+        String instanceId = instanceId();
+        Path serviceIdFile = ServiceIdFile.defaultPath(instanceId);
+        if (ServiceIdFile.exists(serviceIdFile)) {
+            ServiceID existing = ServiceIdFile.read(serviceIdFile);
+            ServiceIdFile.write(serviceIdFile, existing);
+            System.out.println("SERVICE_ID " + existing);
+        }
+        LookupDiscoveryManager discovery = Discovery.open();
+        ServiceExporter.Running running = ServiceExporter.joinAnnotated(
+                discovery,
+                () -> new BasicJeriExporter(TcpServerEndpoint.getInstance(0), new BasicILFactory(), false, false),
+                null,
+                serviceIdFile,
+                new Entry[0],
+                LOOKUP_WAIT_MILLIS,
+                implementation);
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> shutdown(running, discovery)));
+        Object exported = running.only();
+        System.out.println("EXPORT " + ServiceExporter.describe(implementation.getClass()));
+        System.out.println("PUBLISHED " + running.published());
+        System.out.println("SKIPPED " + running.skipped());
+        if (ServiceIdFile.exists(serviceIdFile)) {
+            System.out.println("SERVICE_ID " + ServiceIdFile.read(serviceIdFile));
+        }
+        System.out.println("JOINED " + exported);
         Thread.currentThread().join();
     }
 
-    private static void persist(PathAndId stored, ServiceID id) {
+    private static void shutdown(ServiceExporter.Running running, LookupDiscoveryManager discovery) {
         try {
-            ServiceIds.write(stored.path, id);
-            System.out.println("SERVICE_ID " + id);
-        } catch (Exception e) {
-            throw new IllegalStateException("kunde inte spara ServiceID i " + stored.path, e);
+            running.unexport();
+        } catch (Exception ignored) {
+            // process is exiting
+        }
+        try {
+            running.close();
+        } catch (Exception ignored) {
+            // process is exiting
+        }
+        try {
+            discovery.terminate();
+        } catch (Exception ignored) {
+            // process is exiting
         }
     }
 
-    private record PathAndId(java.nio.file.Path path) {}
+    static String instanceId() {
+        String configured = System.getProperty("river.instance");
+        if (configured != null && !configured.isBlank()) {
+            return configured;
+        }
+        return "0";
+    }
 }

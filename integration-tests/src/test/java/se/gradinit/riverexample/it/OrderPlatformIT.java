@@ -16,8 +16,7 @@ import org.junit.jupiter.api.Timeout;
 
 /**
  * Starts GradinITRiver, deploys customer and order, calls the client, monitors and undeploys.
- * Requires {@code scripts/install-gradinit-river.sh} (or the CI checkout) so the platform jars
- * are in the local Maven repository.
+ * Platform jars come from GitHub Packages ({@code se.gradinit.river}, server id {@code github}).
  */
 class OrderPlatformIT {
     private Process bootstrap;
@@ -37,13 +36,14 @@ class OrderPlatformIT {
         if (!Files.isDirectory(repoRoot.resolve("client"))) {
             repoRoot = Path.of(System.getProperty("user.dir"));
         }
-        String version = System.getProperty("gradinit.river.version", "3.0.0-gradinit");
-        Path m2 = Path.of(System.getProperty("user.home"), ".m2", "repository", "se", "gradinit", "river");
-        Path bootstrapJar = artifact(m2, "platform-bootstrap", version);
-        Path cliJar = artifact(m2, "platform-cli", version);
-        Path compatJar = artifact(m2, "compat-rmi-activation", version);
-        assertTrue(Files.isRegularFile(bootstrapJar), "saknar " + bootstrapJar + " — kör scripts/install-gradinit-river.sh");
+        String version = System.getProperty("gradinit.river.version", "3.0.0-gradinit-SNAPSHOT");
+        Path bootstrapJar = configuredOrResolved("river.bootstrap.jar", "platform-bootstrap", version);
+        Path cliJar = configuredOrResolved("river.cli.jar", "platform-cli", version);
+        Path compatJar = configuredOrResolved("river.compat.jar", "compat-rmi-activation", version);
+        assertTrue(Files.isRegularFile(bootstrapJar), "saknar " + bootstrapJar
+                + " — lös se.gradinit.river från GitHub Packages (docs/beroenden.md)");
         assertTrue(Files.isRegularFile(cliJar), "saknar " + cliJar);
+        assertTrue(Files.isRegularFile(compatJar), "saknar " + compatJar);
 
         Path customerJar = repoRoot.resolve("customer-component/target/customer-component-1.0.0.jar");
         Path orderJar = repoRoot.resolve("order-component/target/order-component-1.0.0.jar");
@@ -91,8 +91,28 @@ class OrderPlatformIT {
         assertEquals(0, undeployCustomer.exit, undeployCustomer.output);
     }
 
-    private static Path artifact(Path groupDir, String artifact, String version) {
-        return groupDir.resolve(artifact).resolve(version).resolve(artifact + "-" + version + ".jar");
+    private static Path configuredOrResolved(String property, String artifact, String version) throws IOException {
+        String configured = System.getProperty(property);
+        if (configured != null && !configured.isBlank()) {
+            return Path.of(configured);
+        }
+        Path dir = Path.of(System.getProperty("user.home"), ".m2", "repository", "se", "gradinit", "river", artifact, version);
+        if (!Files.isDirectory(dir)) {
+            return dir.resolve(artifact + "-" + version + ".jar");
+        }
+        Path newest = null;
+        try (var candidates = Files.newDirectoryStream(dir, artifact + "-*.jar")) {
+            for (Path candidate : candidates) {
+                String name = candidate.getFileName().toString();
+                if (name.endsWith("-sources.jar") || name.endsWith("-javadoc.jar") || name.endsWith("-tests.jar")) {
+                    continue;
+                }
+                if (newest == null || Files.getLastModifiedTime(candidate).compareTo(Files.getLastModifiedTime(newest)) > 0) {
+                    newest = candidate;
+                }
+            }
+        }
+        return newest == null ? dir.resolve(artifact + "-" + version + ".jar") : newest;
     }
 
     private static List<String> jvmFlags(Path compatJar) {

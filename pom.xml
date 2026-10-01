@@ -13,8 +13,8 @@
   <description>Fristående exempel som använder GradinITRiver som vanliga Maven-beroenden.</description>
 
   <properties>
-    <!-- Pinna mot den version som GradinITRiver@develop installerar (se.gradinit.river:gradinit-river). -->
-    <gradinit.river.version>3.0.0-gradinit</gradinit.river.version>
+    <!-- SNAPSHOT från develop. Taggen v3.0.0-gradinit publicerar 3.0.0-gradinit. -->
+    <gradinit.river.version>3.0.0-gradinit-SNAPSHOT</gradinit.river.version>
     <maven.compiler.release>25</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <junit.version>5.11.4</junit.version>
@@ -34,43 +34,10 @@
     <dependencies>
       <dependency>
         <groupId>se.gradinit.river</groupId>
-        <artifactId>platform-api</artifactId>
+        <artifactId>gradinit-river-bom</artifactId>
         <version>${gradinit.river.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>se.gradinit.river</groupId>
-        <artifactId>platform-cli</artifactId>
-        <version>${gradinit.river.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>se.gradinit.river</groupId>
-        <artifactId>platform-bootstrap</artifactId>
-        <version>${gradinit.river.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>se.gradinit.river</groupId>
-        <artifactId>platform-deployer</artifactId>
-        <version>${gradinit.river.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>se.gradinit.river</groupId>
-        <artifactId>platform-supervisor</artifactId>
-        <version>${gradinit.river.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>se.gradinit.river</groupId>
-        <artifactId>jsk-platform</artifactId>
-        <version>${gradinit.river.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>se.gradinit.river</groupId>
-        <artifactId>reggie</artifactId>
-        <version>${gradinit.river.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>se.gradinit.river</groupId>
-        <artifactId>compat-rmi-activation</artifactId>
-        <version>${gradinit.river.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
       <dependency>
         <groupId>se.gradinit.riverexample</groupId>
@@ -95,13 +62,53 @@
     </dependencies>
   </dependencyManagement>
 
+  <repositories>
+    <repository>
+      <id>github</id>
+      <name>GradinITRiver GitHub Packages</name>
+      <url>https://maven.pkg.github.com/GradinIT/GradinITRiver</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+        <updatePolicy>always</updatePolicy>
+      </snapshots>
+    </repository>
+  </repositories>
+
   <build>
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>copy-compat-rmi-activation</id>
+            <phase>generate-test-resources</phase>
+            <goals>
+              <goal>copy</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>se.gradinit.river</groupId>
+                  <artifactId>compat-rmi-activation</artifactId>
+                  <version>${gradinit.river.version}</version>
+                  <destFileName>compat-rmi-activation.jar</destFileName>
+                </artifactItem>
+              </artifactItems>
+              <outputDirectory>${project.build.directory}/river-jvm</outputDirectory>
+              <overWriteSnapshots>true</overWriteSnapshots>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
-          <argLine>--patch-module java.rmi=${settings.localRepository}/se/gradinit/river/compat-rmi-activation/${gradinit.river.version}/compat-rmi-activation-${gradinit.river.version}.jar --add-exports java.rmi/java.rmi.activation=ALL-UNNAMED</argLine>
+          <argLine>--patch-module java.rmi=${project.build.directory}/river-jvm/compat-rmi-activation.jar --add-exports java.rmi/java.rmi.activation=ALL-UNNAMED</argLine>
         </configuration>
       </plugin>
     </plugins>
@@ -131,6 +138,11 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-failsafe-plugin</artifactId>
           <version>3.5.2</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-dependency-plugin</artifactId>
+          <version>3.8.1</version>
         </plugin>
       </plugins>
     </pluginManagement>

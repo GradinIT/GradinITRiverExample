@@ -54,13 +54,50 @@
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>copy-platform-jars</id>
+            <phase>pre-integration-test</phase>
+            <goals>
+              <goal>copy</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>se.gradinit.river</groupId>
+                  <artifactId>platform-bootstrap</artifactId>
+                  <version>${gradinit.river.version}</version>
+                  <destFileName>platform-bootstrap.jar</destFileName>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>se.gradinit.river</groupId>
+                  <artifactId>platform-cli</artifactId>
+                  <version>${gradinit.river.version}</version>
+                  <destFileName>platform-cli.jar</destFileName>
+                </artifactItem>
+              </artifactItems>
+              <outputDirectory>${project.build.directory}/river-jars</outputDirectory>
+              <overWriteSnapshots>true</overWriteSnapshots>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-failsafe-plugin</artifactId>
         <configuration>
           <includes>
             <include>**/*IT.java</include>
           </includes>
           <forkedProcessTimeoutInSeconds>600</forkedProcessTimeoutInSeconds>
-          <argLine>--patch-module java.rmi=${settings.localRepository}/se/gradinit/river/compat-rmi-activation/${gradinit.river.version}/compat-rmi-activation-${gradinit.river.version}.jar --add-exports java.rmi/java.rmi.activation=ALL-UNNAMED</argLine>
+          <argLine>--patch-module java.rmi=${project.build.directory}/river-jvm/compat-rmi-activation.jar --add-exports java.rmi/java.rmi.activation=ALL-UNNAMED</argLine>
+          <systemPropertyVariables>
+            <gradinit.river.version>${gradinit.river.version}</gradinit.river.version>
+            <river.bootstrap.jar>${project.build.directory}/river-jars/platform-bootstrap.jar</river.bootstrap.jar>
+            <river.cli.jar>${project.build.directory}/river-jars/platform-cli.jar</river.cli.jar>
+            <river.compat.jar>${project.build.directory}/river-jvm/compat-rmi-activation.jar</river.compat.jar>
+          </systemPropertyVariables>
         </configuration>
         <executions>
           <execution>

@@ -1,8 +1,8 @@
 # GradinITRiverExample
 
-Ett fristående exempel som använder [GradinITRiver](https://github.com/GradinIT/GradinITRiver) (`develop`, `se.gradinit.river`, version `3.0.0-gradinit`) som vanliga Maven-beroenden. Ingen plattformskod är kopierad hit.
+Ett fristående exempel som använder [GradinITRiver](https://github.com/GradinIT/GradinITRiver) (`se.gradinit.river`, version `3.0.0-gradinit-SNAPSHOT`) som vanliga Maven-beroenden från GitHub Packages. Ingen plattformskod är kopierad hit.
 
-`customer` är en komponent med en instans. `order` är en komponent med tre backendar och en router, och beror på kunden via `META-INF/order_conf.xml` (gränssnitt + Jini-`Name`). Klienten anropar routern. Routern väljer backend med HRW på `customerId`, märkt `@Routing`.
+`customer` är en komponent med en instans. `order` är en komponent med tre backendar och en router, och beror på kunden via `META-INF/order_conf.xml` (gränssnitt + Jini-`Name`). Klienten anropar routern. Routern väljer backend med plattformens HRW (`HrwSelector` och `RoutingKeys`) på `customerId`, märkt `@Routing`.
 
 ## Arkitektur
 
@@ -27,18 +27,14 @@ Mer om flödet finns i [docs/arkitektur.md](docs/arkitektur.md).
 
 ## Så här kör du
 
-Kräver JDK 25 eller senare.
+Kräver JDK 25 eller senare, och läsrättighet till paketen på `https://maven.pkg.github.com/GradinIT/GradinITRiver`.
 
-1. Installera plattformens JAR-filer från `develop` (de publiceras inte):
-
-   ```bash
-   ./scripts/install-gradinit-river.sh
-   ```
+1. Lägg en server med id `github` i `~/.m2/settings.xml`. Lösenordet är en token med `read:packages`. Se [docs/beroenden.md](docs/beroenden.md).
 
 2. Bygg och kör integrationstestet, som startar bootstrap, deployar båda komponenterna, anropar klienten, kör `river monitor` och undeployar:
 
    ```bash
-   ./mvnw -B verify
+   ./mvnw -B -U verify
    ```
 
 3. Eller kör samma flöde som en demo:
@@ -49,7 +45,7 @@ Kräver JDK 25 eller senare.
 
 JVM-flaggorna `--patch-module java.rmi=...` och `--add-exports java.rmi/java.rmi.activation=ALL-UNNAMED` sätts av `scripts/river-jvm-flags.sh`. Steg för steg, inklusive kommandona för hand, finns i [docs/korning.md](docs/korning.md).
 
-Versionen är pinnad med `gradinit.river.version` i `pom.xml`. Hur beroendet löses, varför JitPack inte används, och rekommendationen att publicera till GitHub Packages beskrivs i [docs/beroenden.md](docs/beroenden.md).
+Versionen är pinnad med `gradinit.river.version` i `pom.xml`. Paketrepot, BOM-importen och den lokala token-konfigurationen beskrivs i [docs/beroenden.md](docs/beroenden.md).
 
 ## Moduler
 
@@ -60,6 +56,7 @@ Versionen är pinnad med `gradinit.river.version` i `pom.xml`. Hur beroendet lö
 | `order-api` | `OrderService` och `OrderRequest` med `@Routing` på `customerId` |
 | `order-component` | tre backendar och en router, `META-INF/order_conf.xml` |
 | `client` | slår upp `OrderService` + `Name("order")` |
+| `example-support` | discovery, lookup och `ServiceExporter.joinAnnotated` |
 | `integration-tests` | `OrderPlatformIT` |
 
 ## Dokumentation
@@ -80,4 +77,4 @@ Plattformens dokumentation på `develop`:
 - [docs/supervisor.md](https://github.com/GradinIT/GradinITRiver/blob/develop/docs/supervisor.md)
 - [docs/komponent-deploy-analys.md](https://github.com/GradinIT/GradinITRiver/blob/develop/docs/komponent-deploy-analys.md)
 
-Begränsningar som gör extern användning svårare, bland annat opublicerade artefakter, 404 vid checkout och JVM-flaggorna, står i [docs/kanda-problem.md](docs/kanda-problem.md).
+Begränsningar, bland annat att paketen kräver en PAT med `read:packages` eftersom GradinIT är ett personligt konto, står i [docs/kanda-problem.md](docs/kanda-problem.md).

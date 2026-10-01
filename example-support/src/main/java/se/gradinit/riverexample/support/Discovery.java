@@ -2,7 +2,6 @@ package se.gradinit.riverexample.support;
 
 import java.rmi.RemoteException;
 import net.jini.core.discovery.LookupLocator;
-import net.jini.discovery.DiscoveryManagement;
 import net.jini.discovery.LookupDiscovery;
 import net.jini.discovery.LookupDiscoveryManager;
 
@@ -16,7 +15,7 @@ public final class Discovery {
 
     private Discovery() {}
 
-    public static DiscoveryManagement open() throws RemoteException, java.io.IOException {
+    public static LookupDiscoveryManager open() throws RemoteException, java.io.IOException {
         String locator = System.getProperty(LOOKUP_PROPERTY, DEFAULT_LOCATOR);
         LookupLocator[] locators = locator.isBlank()
                 ? null
