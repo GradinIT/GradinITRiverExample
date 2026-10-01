@@ -1,0 +1,52 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        java: ["25", "26"]
+    steps:
+      - name: Hämta exemplet
+        uses: actions/checkout@v4
+
+      - name: JDK ${{ matrix.java }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+
+      # GradinIT är ett personligt konto, så paket kan inte delas via Manage Actions access.
+      # GITHUB_TOKEN läser därför inte de här paketen. Hemligheten är en classic PAT med read:packages.
+      - name: Maven-inloggning mot GitHub Packages
+        env:
+          PACKAGES_TOKEN: ${{ secrets.GRADINIT_PACKAGES_TOKEN }}
+        run: |
+          if [ -z "${PACKAGES_TOKEN}" ]; then
+            echo "::error title=GitHub Packages::Hemligheten GRADINIT_PACKAGES_TOKEN saknas. Den ska vara en classic PAT med read:packages mot GradinIT. GITHUB_TOKEN kan inte läsa paketen."
+            exit 1
+          fi
+          mkdir -p ~/.m2
+          umask 077
+          cat > ~/.m2/settings.xml << EOF
+          <settings>
+            <servers>
+              <server>
+                <id>github</id>
+                <username>GradinIT</username>
+                <password>${PACKAGES_TOKEN}</password>
+              </server>
+            </servers>
+          </settings>
+          EOF
+
+      - name: Bygg och testa exemplet
+        run: ./mvnw -B -U verify

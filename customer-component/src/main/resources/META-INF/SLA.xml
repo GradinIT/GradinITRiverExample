@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component xmlns="urn:se:gradinit:river:sla" name="customer" version="1.0.0">
+  <service interface="se.gradinit.riverexample.customer.CustomerService"
+           name="customer"
+           instances="1"
+           mainClass="se.gradinit.riverexample.customer.CustomerMain"/>
+</component>

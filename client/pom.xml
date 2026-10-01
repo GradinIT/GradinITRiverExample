@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>se.gradinit.riverexample</groupId>
+    <artifactId>gradinit-river-example</artifactId>
+    <version>1.0.0</version>
+  </parent>
+  <artifactId>client</artifactId>
+  <name>client</name>
+
+  <dependencies>
+    <dependency>
+      <groupId>se.gradinit.riverexample</groupId>
+      <artifactId>order-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>se.gradinit.riverexample</groupId>
+      <artifactId>example-support</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>se.gradinit.river</groupId>
+      <artifactId>jsk-platform</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>se.gradinit.river</groupId>
+      <artifactId>reggie</artifactId>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>write-classpath</id>
+            <phase>package</phase>
+            <goals>
+              <goal>build-classpath</goal>
+            </goals>
+            <configuration>
+              <outputFile>${project.build.directory}/classpath.txt</outputFile>
+              <includeScope>runtime</includeScope>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>3.5.0</version>
+        <configuration>
+          <mainClass>se.gradinit.riverexample.client.OrderClient</mainClass>
+          <arguments>
+            <argument>alice</argument>
+            <argument>SKU-100</argument>
+            <argument>1</argument>
+          </arguments>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>

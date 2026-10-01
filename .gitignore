@@ -1,0 +1,11 @@
+target/
+.upstream/
+var/
+*.serviceid
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+*.log
+.mvn/wrapper/maven-wrapper.jar
