@@ -12,7 +12,7 @@ Följ [beroenden.md](beroenden.md): server-id `github` i `~/.m2/settings.xml`, t
 ./mvnw -B -U verify
 ```
 
-`verify` kör enhetstester och `OrderPlatformIT`: bootstrap, `river deploy` av båda komponenterna, klientanrop, `river monitor`, `river undeploy`.
+`verify` kör enhetstester. `OrderPlatformIT` är avstängt tills publicerad `platform-bootstrap` har `PlatformMain` (`Main-Class`) som skriver `RIVER_PLATFORM_READY`. Den nuvarande SNAPSHOT har ingen startpunkt.
 
 Om Maven inte kan hämta `se.gradinit.river:gradinit-river-bom:3.0.0-gradinit-SNAPSHOT` saknas token i `settings.xml` eller hemligheten `GRADINIT_PACKAGES_TOKEN` i Actions.
 

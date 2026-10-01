@@ -31,13 +31,13 @@ Kräver JDK 25 eller senare, och läsrättighet till paketen på `https://maven.
 
 1. Lägg en server med id `github` i `~/.m2/settings.xml`. Lösenordet är en token med `read:packages`. Se [docs/beroenden.md](docs/beroenden.md).
 
-2. Bygg och kör integrationstestet, som startar bootstrap, deployar båda komponenterna, anropar klienten, kör `river monitor` och undeployar:
+2. Bygg och kör enhetstesterna. `OrderPlatformIT` är avstängt tills `platform-bootstrap` publicerar `PlatformMain`:
 
    ```bash
    ./mvnw -B -U verify
    ```
 
-3. Eller kör samma flöde som en demo:
+3. När `PlatformMain` finns i den publicerade SNAPSHOT körs samma flöde som en demo:
 
    ```bash
    ./scripts/run-demo.sh

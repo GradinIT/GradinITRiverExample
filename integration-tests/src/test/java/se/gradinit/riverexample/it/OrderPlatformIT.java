@@ -4,26 +4,27 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 /**
  * Starts GradinITRiver, deploys customer and order, calls the client, monitors and undeploys.
  * Platform jars come from GitHub Packages ({@code se.gradinit.river}, server id {@code github}).
+ *
+ * <p>Skipped until {@code platform-bootstrap} publishes {@code PlatformMain} with {@code Main-Class}
+ * and prints {@code RIVER_PLATFORM_READY}. The current snapshot has no entry point, and
+ * {@code PlatformRuntime.activationClasses()} only resolves inside the GradinITRiver build tree.
  */
+@Disabled("Väntar på PlatformMain i publicerad platform-bootstrap (Main-Class och RIVER_PLATFORM_READY). Nuvarande SNAPSHOT har ingen startpunkt.")
 class OrderPlatformIT {
     private Process bootstrap;
 
@@ -63,15 +64,13 @@ class OrderPlatformIT {
         Files.createDirectories(logs);
         List<String> jvm = jvmFlags(compatJar);
         String platformClasspath = platformClasspath();
-        String bootstrapMain = mainClass(bootstrapJar, platformClasspath);
-        String cliMain = mainClass(cliJar, platformClasspath);
-        System.out.println("BOOTSTRAP_MAIN " + bootstrapMain);
-        System.out.println("CLI_MAIN " + cliMain);
+        String bootstrapMain = mainClass(bootstrapJar);
+        String cliMain = mainClass(cliJar);
 
         Path bootstrapLog = logs.resolve("bootstrap.log");
         bootstrap = start(bootstrapLog, repoRoot, jvm, "-cp", platformClasspath, bootstrapMain);
-        Thread.sleep(Duration.ofSeconds(15).toMillis());
-        assertTrue(bootstrap.isAlive(), "bootstrap dog\n" + Files.readString(bootstrapLog));
+        assertTrue(awaitReady(bootstrap, bootstrapLog, Duration.ofSeconds(60)),
+                "bootstrap blev inte RIVER_PLATFORM_READY\n" + Files.readString(bootstrapLog));
 
         CommandResult deployedCustomer = river(logs, repoRoot, jvm, platformClasspath, cliMain, "deploy", customerJar.toString());
         assertEquals(0, deployedCustomer.exit, deployedCustomer.output);
@@ -137,168 +136,28 @@ class OrderPlatformIT {
         return classpath;
     }
 
-    private static String mainClass(Path jar, String classpath) throws IOException {
-        String fromManifest = manifestMain(jar);
-        if (fromManifest != null) {
-            return fromManifest;
-        }
-        List<String> inJar = mainsIn(jar);
-        if (!inJar.isEmpty()) {
-            return preferMain(inJar);
-        }
-        List<String> platformMains = new ArrayList<>();
-        List<String> everyMain = new ArrayList<>();
-        for (String entry : classpath.split(System.getProperty("path.separator"))) {
-            Path candidate = Path.of(entry);
-            if (!Files.isRegularFile(candidate) || !candidate.getFileName().toString().endsWith(".jar")) {
-                continue;
-            }
-            for (String name : mainsIn(candidate)) {
-                everyMain.add(candidate.getFileName() + " " + name);
-                if (name.contains(".bootstrap.")
-                        || name.endsWith(".ServiceStarter")
-                        || name.endsWith("Bootstrap")
-                        || name.contains(".start.ServiceStarter")) {
-                    platformMains.add(name);
-                }
-            }
-        }
-        if (!platformMains.isEmpty()) {
-            return preferMain(platformMains);
-        }
-        List<String> entries = new ArrayList<>();
-        try (JarFile file = new JarFile(jar.toFile())) {
-            file.stream().limit(60).forEach(item -> entries.add(item.getName()));
-        }
-        assertTrue(false, "ingen startklass i " + jar
-                + "\nentries=" + entries
-                + "\nmains=" + everyMain);
-        return "";
-    }
-
-    private static String manifestMain(Path jar) throws IOException {
+    private static String mainClass(Path jar) throws IOException {
         try (JarFile file = new JarFile(jar.toFile())) {
             var manifest = file.getManifest();
-            if (manifest == null) {
-                return null;
-            }
-            String main = manifest.getMainAttributes().getValue("Main-Class");
-            return main == null || main.isBlank() ? null : main.trim();
+            String main = manifest == null ? null : manifest.getMainAttributes().getValue("Main-Class");
+            assertTrue(main != null && !main.isBlank(), "ingen Main-Class i " + jar
+                    + " — kräver PlatformMain i publicerad platform-bootstrap");
+            return main.trim();
         }
     }
 
-    private static String preferMain(List<String> names) {
-        return names.stream()
-                .min(Comparator.comparingInt(OrderPlatformIT::mainRank))
-                .orElseThrow();
-    }
-
-    private static int mainRank(String name) {
-        if (name.startsWith("se.gradinit.river.platform.bootstrap.")) {
-            return 0;
-        }
-        if (name.endsWith("Bootstrap") || name.endsWith("Main")) {
-            return 1;
-        }
-        if (name.equals("com.sun.jini.start.ServiceStarter")) {
-            return 2;
-        }
-        return 3;
-    }
-
-    private static List<String> mainsIn(Path jar) throws IOException {
-        List<String> found = new ArrayList<>();
-        try (JarFile file = new JarFile(jar.toFile())) {
-            var entries = file.entries();
-            while (entries.hasMoreElements()) {
-                JarEntry entry = entries.nextElement();
-                String name = entry.getName();
-                if (!name.endsWith(".class") || name.contains("$") || name.startsWith("META-INF/versions/")) {
-                    continue;
-                }
-                try (InputStream in = file.getInputStream(entry)) {
-                    if (hasPublicStaticMain(in.readAllBytes())) {
-                        found.add(name.substring(0, name.length() - ".class".length()).replace('/', '.'));
-                    }
-                } catch (RuntimeException ignored) {
-                    // skip a class file the scanner cannot parse
-                }
-            }
-        }
-        return found;
-    }
-
-    private static boolean hasPublicStaticMain(byte[] bytes) {
-        if (bytes.length < 24 || (bytes[0] & 0xff) != 0xca || (bytes[1] & 0xff) != 0xfe) {
-            return false;
-        }
-        ByteBuffer buf = ByteBuffer.wrap(bytes);
-        buf.position(8);
-        int count = buf.getShort() & 0xffff;
-        String[] utf8 = new String[count];
-        for (int i = 1; i < count; i++) {
-            int tag = buf.get() & 0xff;
-            switch (tag) {
-                case 1 -> {
-                    int len = buf.getShort() & 0xffff;
-                    byte[] data = new byte[len];
-                    buf.get(data);
-                    utf8[i] = new String(data, StandardCharsets.UTF_8);
-                }
-                case 7, 8, 16, 19, 20 -> buf.getShort();
-                case 15 -> {
-                    buf.get();
-                    buf.getShort();
-                }
-                case 3, 4, 9, 10, 11, 12, 17, 18 -> buf.getInt();
-                case 5, 6 -> {
-                    buf.getLong();
-                    i++;
-                }
-                default -> {
-                    return false;
-                }
-            }
-        }
-        buf.getShort();
-        buf.getShort();
-        buf.getShort();
-        int interfaces = buf.getShort() & 0xffff;
-        buf.position(buf.position() + interfaces * 2);
-        int fields = buf.getShort() & 0xffff;
-        for (int i = 0; i < fields; i++) {
-            skipMember(buf);
-        }
-        int methods = buf.getShort() & 0xffff;
-        for (int i = 0; i < methods; i++) {
-            int access = buf.getShort() & 0xffff;
-            int nameIndex = buf.getShort() & 0xffff;
-            int descIndex = buf.getShort() & 0xffff;
-            skipAttributes(buf);
-            if ((access & 0x0001) != 0
-                    && (access & 0x0008) != 0
-                    && "main".equals(utf8[nameIndex])
-                    && "([Ljava/lang/String;)V".equals(utf8[descIndex])) {
+    private static boolean awaitReady(Process process, Path log, Duration timeout) throws IOException, InterruptedException {
+        long deadline = System.nanoTime() + timeout.toNanos();
+        while (System.nanoTime() < deadline) {
+            if (Files.isRegularFile(log) && Files.readString(log).contains("RIVER_PLATFORM_READY")) {
                 return true;
             }
+            if (!process.isAlive()) {
+                return false;
+            }
+            Thread.sleep(250);
         }
-        return false;
-    }
-
-    private static void skipMember(ByteBuffer buf) {
-        buf.getShort();
-        buf.getShort();
-        buf.getShort();
-        skipAttributes(buf);
-    }
-
-    private static void skipAttributes(ByteBuffer buf) {
-        int attributes = buf.getShort() & 0xffff;
-        for (int i = 0; i < attributes; i++) {
-            buf.getShort();
-            int length = buf.getInt();
-            buf.position(buf.position() + length);
-        }
+        return Files.isRegularFile(log) && Files.readString(log).contains("RIVER_PLATFORM_READY");
     }
 
     private static List<String> jvmFlags(Path compatJar) {
