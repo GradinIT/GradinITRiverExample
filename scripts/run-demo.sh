@@ -105,7 +105,6 @@ if [[ -z "$locator" ]]; then
   exit 1
 fi
 echo "Lookup $locator"
-export JAVA_TOOL_OPTIONS="-Dse.gradinit.river.lookup=${locator}"
 
 river() {
   echo "+ river $*"

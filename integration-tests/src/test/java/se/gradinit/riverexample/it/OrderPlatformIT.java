@@ -75,8 +75,9 @@ class OrderPlatformIT {
                 + "\n--- bin/river-platform ---\n" + scriptHead(platformBin));
         locator = usableLocator(locator);
 
-        Map<String, String> lookupEnv = Map.of(
-                "JAVA_TOOL_OPTIONS", "-Dse.gradinit.river.lookup=" + locator);
+        // bin/river parses `java -version`. JAVA_TOOL_OPTIONS adds a "Picked up" line and the
+// script then rejects the JDK. The client gets the locator with -D on its own command line.
+Map<String, String> lookupEnv = Map.of();
 
         CommandResult deployedCustomer = river(logs, distHome, riverBin, lookupEnv, "deploy", customerJar.toString());
         assertEquals(0, deployedCustomer.exit, deployedCustomer.output + diagnostics(platform, platformLog, distHome));

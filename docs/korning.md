@@ -30,10 +30,9 @@ DIST="$(cat integration-tests/target/river-dist-home.txt)"
 "$DIST/bin/river-platform" --clean
 ```
 
-Vänta på `RIVER_PLATFORM_READY jini://host:port`. Sätt lookup-URL:en och fortsätt i en annan terminal:
+Vänta på `RIVER_PLATFORM_READY jini://host:port`. Fortsätt i en annan terminal. Sätt inte `JAVA_TOOL_OPTIONS`. `bin/river` läser `java -version`, och en `Picked up`-rad gör att den kontrollen faller.
 
 ```bash
-export JAVA_TOOL_OPTIONS="-Dse.gradinit.river.lookup=jini://host:port"
 "$DIST/bin/river" deploy customer-component/target/customer-component-1.0.0.jar
 "$DIST/bin/river" deploy order-component/target/order-component-1.0.0.jar
 "$DIST/bin/river-web-console"
