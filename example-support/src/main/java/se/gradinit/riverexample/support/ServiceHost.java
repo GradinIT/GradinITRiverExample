@@ -7,6 +7,7 @@ import net.jini.discovery.LookupDiscoveryManager;
 import net.jini.jeri.BasicILFactory;
 import net.jini.jeri.BasicJeriExporter;
 import net.jini.jeri.tcp.TcpServerEndpoint;
+import se.gradinit.river.platform.annotation.ExportedService;
 import se.gradinit.river.platform.export.ServiceExporter;
 import se.gradinit.river.platform.identity.ServiceIdFile;
 
@@ -28,11 +29,16 @@ public final class ServiceHost {
             ServiceIdFile.write(serviceIdFile, existing);
             System.out.println("SERVICE_ID " + existing);
         }
+        ExportedService marked = implementation.getClass().getAnnotation(ExportedService.class);
+        String name = marked == null ? null : marked.name();
+        if (name != null && name.isBlank()) {
+            name = null;
+        }
         LookupDiscoveryManager discovery = Discovery.open();
         ServiceExporter.Running running = ServiceExporter.joinAnnotated(
                 discovery,
                 () -> new BasicJeriExporter(TcpServerEndpoint.getInstance(0), new BasicILFactory(), false, false),
-                null,
+                name,
                 serviceIdFile,
                 new Entry[0],
                 LOOKUP_WAIT_MILLIS,

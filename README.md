@@ -25,25 +25,69 @@ flowchart TB
 
 Mer om flödet finns i [docs/arkitektur.md](docs/arkitektur.md).
 
-## Så här kör du
+## Snabbstart
 
 Kräver JDK 25 eller senare, och läsrättighet till paketen på `https://maven.pkg.github.com/GradinIT/GradinITRiver`.
 
 1. Lägg en server med id `github` i `~/.m2/settings.xml`. Lösenordet är en token med `read:packages`. Se [docs/beroenden.md](docs/beroenden.md).
 
-2. Bygg och kör enhetstesterna. `OrderPlatformIT` är avstängt tills `platform-bootstrap` publicerar `PlatformMain`:
+2. Bygg exemplet. Det hämtar `3.0.0-gradinit-SNAPSHOT` (`-U`) och packar upp `gradinit-river-dist`:
 
    ```bash
-   ./mvnw -B -U verify
+   ./mvnw -B -U -DskipITs package
    ```
 
-3. När `PlatformMain` finns i den publicerade SNAPSHOT körs samma flöde som en demo:
+   Filen `integration-tests/target/river-dist-home.txt` innehåller katalogen där `bin/river-platform`, `bin/river` och `bin/river-web-console` ligger.
+
+3. Starta en tom plattform i en terminal. Vänta på raden `RIVER_PLATFORM_READY jini://host:port`.
 
    ```bash
-   ./scripts/run-demo.sh
+   DIST="$(cat integration-tests/target/river-dist-home.txt)"
+   "$DIST/bin/river-platform" --clean
    ```
 
-JVM-flaggorna `--patch-module java.rmi=...` och `--add-exports java.rmi/java.rmi.activation=ALL-UNNAMED` sätts av `scripts/river-jvm-flags.sh`. Steg för steg, inklusive kommandona för hand, finns i [docs/korning.md](docs/korning.md).
+4. Deploya komponenterna i en annan terminal. Byt `jini://host:port` mot URL:en från steg 3.
+
+   ```bash
+   export JAVA_TOOL_OPTIONS="-Dse.gradinit.river.lookup=jini://host:port"
+   "$DIST/bin/river" deploy customer-component/target/customer-component-1.0.0.jar
+   "$DIST/bin/river" deploy order-component/target/order-component-1.0.0.jar
+   ```
+
+5. Kör klienten. Samma `customerId` ska ge samma `backendId` på båda raderna `ORDER_OK`.
+
+   ```bash
+   mapfile -t FLAGS < <(./scripts/river-jvm-flags.sh)
+   JAVA="${JAVA_HOME:-}/bin/java"
+   [[ -x "$JAVA" ]] || JAVA="$(command -v java)"
+   "$JAVA" "${FLAGS[@]}" -Dse.gradinit.river.lookup=jini://host:port \
+     -cp "client/target/client-1.0.0.jar:$(cat client/target/classpath.txt)" \
+     se.gradinit.riverexample.client.OrderClient alice SKU-100 1
+   ```
+
+6. Starta webbkonsolen i en tredje terminal, mot samma plattform. Avsluta den med Ctrl-C.
+
+   ```bash
+   export JAVA_TOOL_OPTIONS="-Dse.gradinit.river.lookup=jini://host:port"
+   "$DIST/bin/river-web-console"
+   ```
+
+7. Ta ner komponenterna och stoppa plattformen med Ctrl-C i terminalen från steg 3.
+
+   ```bash
+   "$DIST/bin/river" undeploy order
+   "$DIST/bin/river" undeploy customer
+   ```
+
+Enhetstesterna:
+
+```bash
+./mvnw -B -U verify
+```
+
+`OrderPlatformIT` är avstängt tills GradinITRivers supervisor skickar `--patch-module` och `--add-exports` till komponenternas barn-JVM. Den ändringen görs uppströms. Snabbstarten ovan är flödet när den SNAPSHOT finns. `./scripts/run-demo.sh` gör samma steg.
+
+JVM-flaggorna `--patch-module java.rmi=...` och `--add-exports java.rmi/java.rmi.activation=ALL-UNNAMED` behövs för exempelklienten. `bin/river-platform` och `bin/river` sätter dem själva. Steg för steg finns i [docs/korning.md](docs/korning.md).
 
 Versionen är pinnad med `gradinit.river.version` i `pom.xml`. Paketrepot, BOM-importen och den lokala token-konfigurationen beskrivs i [docs/beroenden.md](docs/beroenden.md).
 

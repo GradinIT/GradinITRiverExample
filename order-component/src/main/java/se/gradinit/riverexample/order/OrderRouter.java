@@ -15,7 +15,8 @@ import se.gradinit.riverexample.support.ServiceLookup;
 
 /**
  * Client-facing {@link OrderService}. Picks one backend with the platform HRW
- * selector on the {@code @Routing} field of {@link OrderRequest}.
+ * selector on the {@code @Routing} field of {@link OrderRequest}. If that
+ * backend does not answer, the call continues with another live backend.
  */
 @ExportedService(name = "order", remoteInterface = OrderService.class)
 public class OrderRouter implements OrderService {
@@ -37,13 +38,33 @@ public class OrderRouter implements OrderService {
             }
             byte[] routingKey = RoutingKeys.canonicalBytes(request);
             ServiceID chosenId = HrwSelector.select(routingKey, new ArrayList<>(byId.keySet()));
-            ServiceItem chosen = chosenId == null ? null : byId.get(chosenId);
-            if (chosen == null) {
+            if (chosenId == null || !byId.containsKey(chosenId)) {
                 throw new RemoteException("HRW valde ingen backend");
             }
-            OrderService backend = (OrderService) chosen.service;
-            System.out.println("ROUTE customer=" + request.customerId() + " backends=" + byId.size());
-            return backend.place(request);
+            List<ServiceID> attempt = new ArrayList<>();
+            attempt.add(chosenId);
+            for (ServiceID id : byId.keySet()) {
+                if (!id.equals(chosenId)) {
+                    attempt.add(id);
+                }
+            }
+            RemoteException last = null;
+            for (ServiceID id : attempt) {
+                try {
+                    OrderConfirmation confirmation = ((OrderService) byId.get(id).service).place(request);
+                    if (id.equals(chosenId)) {
+                        System.out.println("ROUTE customer=" + request.customerId() + " backends=" + byId.size());
+                    } else {
+                        System.out.println("FAILOVER customer=" + request.customerId()
+                                + " from=" + chosenId + " to=" + id);
+                    }
+                    return confirmation;
+                } catch (RemoteException e) {
+                    last = e;
+                    System.out.println("BACKEND_FAIL " + id + " " + e.getClass().getSimpleName());
+                }
+            }
+            throw last == null ? new RemoteException("ingen backend svarade") : last;
         } catch (RemoteException e) {
             throw e;
         } catch (Exception e) {
