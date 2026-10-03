@@ -66,7 +66,9 @@ class OrderPlatformIT {
         Path logs = repoRoot.resolve("integration-tests/target/platform-logs");
         Files.createDirectories(logs);
         Path platformLog = logs.resolve("platform.log");
-        platform = start(platformLog, distHome, Map.of(), command(platformBin, "--clean"));
+        Path jvmWrapper = repoRoot.resolve("scripts/with-river-jvm.sh");
+        platform = start(platformLog, distHome, Map.of(),
+                List.of("bash", jvmWrapper.toString(), platformBin.toString(), "--clean"));
         String locator = awaitReady(platform, platformLog, Duration.ofSeconds(120));
         assertNotNull(locator, "plattformen blev inte RIVER_PLATFORM_READY\n" + read(platformLog)
                 + "\n--- bin/river-platform ---\n" + scriptHead(platformBin));
@@ -76,9 +78,11 @@ class OrderPlatformIT {
                 "JAVA_TOOL_OPTIONS", "-Dse.gradinit.river.lookup=" + locator);
 
         CommandResult deployedCustomer = river(logs, distHome, riverBin, lookupEnv, "deploy", customerJar.toString());
-        assertEquals(0, deployedCustomer.exit, deployedCustomer.output);
+        assertEquals(0, deployedCustomer.exit, deployedCustomer.output + diagnostics(platform, platformLog));
         CommandResult deployedOrder = river(logs, distHome, riverBin, lookupEnv, "deploy", orderJar.toString());
-        assertEquals(0, deployedOrder.exit, deployedOrder.output);
+        assertEquals(0, deployedOrder.exit, deployedOrder.output
+                + "\n--- customer deploy ---\n" + deployedCustomer.output
+                + diagnostics(platform, platformLog));
 
         CommandResult monitor = monitor(logs, distHome, riverBin, lookupEnv);
         assertTrue(monitor.exit == 0 || !monitor.output.isBlank(), monitor.output);
@@ -396,6 +400,14 @@ class OrderPlatformIT {
 
     private static String read(Path log) throws IOException {
         return Files.isRegularFile(log) ? Files.readString(log) : "";
+    }
+
+    private static String diagnostics(Process platformProcess, Path platformLog) throws IOException {
+        String log = read(platformLog);
+        if (log.length() > 8000) {
+            log = log.substring(log.length() - 8000);
+        }
+        return "\n--- platform ---\n" + log + "\n--- processes ---\n" + describeProcesses(platformProcess);
     }
 
     private static void destroyTree(Process process) {

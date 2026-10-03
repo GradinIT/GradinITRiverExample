@@ -10,6 +10,8 @@ GradinIT är ett personligt konto, så paket kan inte delas med det här repots 
 
 `--patch-module java.rmi=...` och `--add-exports java.rmi/java.rmi.activation=ALL-UNNAMED` behövs på JDK 25 och 26. De kommer från `compat-rmi-activation`. SNAPSHOT-jaren i det lokala repot är tidsstämplade, så sökvägen kan inte hårdkodas mot `artifact-3.0.0-gradinit-SNAPSHOT.jar`.
 
+`bin/river-platform` sätter flaggorna på sin egen JVM. Komponentprocesser ärver inte den kommandoraden. `scripts/with-river-jvm.sh` lägger samma flaggor i `JDK_JAVA_OPTIONS`, som barn-JVM:er läser, och tar bort en extra `--patch-module` om skriptet redan skickar den.
+
 ## SLA och konfiguration
 
 `META-INF/SLA.xml` har namnrymden `urn:se:gradinit:river:sla` och rotelementet `component`. `META-INF/{namn}_conf.xml` har namnrymden `urn:se:gradinit:river:conf` och rotelementet `configuration`. Ett beroende skrivs som `depends` med attributen `interface` och `name`.
