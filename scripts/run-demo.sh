@@ -76,7 +76,7 @@ run_script() {
 }
 
 echo "Startar bin/river-platform --clean"
-bash "$ROOT/scripts/with-river-jvm.sh" "$PLATFORM" --clean >"$LOGS/platform.log" 2>&1 &
+run_script "$PLATFORM" --clean >"$LOGS/platform.log" 2>&1 &
 BOOT_PID=$!
 
 locator=""

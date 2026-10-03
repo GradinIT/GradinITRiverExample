@@ -66,9 +66,7 @@ class OrderPlatformIT {
         Path logs = repoRoot.resolve("integration-tests/target/platform-logs");
         Files.createDirectories(logs);
         Path platformLog = logs.resolve("platform.log");
-        Path jvmWrapper = repoRoot.resolve("scripts/with-river-jvm.sh");
-        platform = start(platformLog, distHome, Map.of(),
-                List.of("bash", jvmWrapper.toString(), platformBin.toString(), "--clean"));
+        platform = start(platformLog, distHome, Map.of(), command(platformBin, "--clean"));
         String locator = awaitReady(platform, platformLog, Duration.ofSeconds(120));
         assertNotNull(locator, "plattformen blev inte RIVER_PLATFORM_READY\n" + read(platformLog)
                 + "\n--- bin/river-platform ---\n" + scriptHead(platformBin));
@@ -78,11 +76,13 @@ class OrderPlatformIT {
                 "JAVA_TOOL_OPTIONS", "-Dse.gradinit.river.lookup=" + locator);
 
         CommandResult deployedCustomer = river(logs, distHome, riverBin, lookupEnv, "deploy", customerJar.toString());
-        assertEquals(0, deployedCustomer.exit, deployedCustomer.output + diagnostics(platform, platformLog));
+        assertEquals(0, deployedCustomer.exit, deployedCustomer.output + diagnostics(platform, platformLog, distHome));
+        CommandResult listed = river(logs, distHome, riverBin, lookupEnv, "list");
         CommandResult deployedOrder = river(logs, distHome, riverBin, lookupEnv, "deploy", orderJar.toString());
         assertEquals(0, deployedOrder.exit, deployedOrder.output
                 + "\n--- customer deploy ---\n" + deployedCustomer.output
-                + diagnostics(platform, platformLog));
+                + "\n--- river list ---\n" + listed.output
+                + diagnostics(platform, platformLog, distHome));
 
         CommandResult monitor = monitor(logs, distHome, riverBin, lookupEnv);
         assertTrue(monitor.exit == 0 || !monitor.output.isBlank(), monitor.output);
@@ -402,12 +402,18 @@ class OrderPlatformIT {
         return Files.isRegularFile(log) ? Files.readString(log) : "";
     }
 
-    private static String diagnostics(Process platformProcess, Path platformLog) throws IOException {
+    private static String diagnostics(Process platformProcess, Path platformLog, Path distHome) throws IOException {
         String log = read(platformLog);
         if (log.length() > 8000) {
             log = log.substring(log.length() - 8000);
         }
-        return "\n--- platform ---\n" + log + "\n--- processes ---\n" + describeProcesses(platformProcess);
+        String env = read(distHome.resolve("bin/_river-env.sh"));
+        if (env.length() > 4000) {
+            env = env.substring(0, 4000);
+        }
+        return "\n--- platform ---\n" + log
+                + "\n--- _river-env.sh ---\n" + env
+                + "\n--- processes ---\n" + describeProcesses(platformProcess);
     }
 
     private static void destroyTree(Process process) {
