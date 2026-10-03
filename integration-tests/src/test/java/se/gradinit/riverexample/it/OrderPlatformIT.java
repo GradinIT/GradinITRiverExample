@@ -101,7 +101,7 @@ class OrderPlatformIT {
         List<String> jvm = jvmFlags(compatJar);
         String clientClasspath = clientJar + System.getProperty("path.separator") + Files.readString(classpathFile).trim();
         CommandResult call = client(logs.resolve("client.log"), repoRoot, jvm, locator, clientClasspath);
-        assertEquals(0, call.exit, call.output);
+        assertEquals(0, call.exit, call.output + diagnostics(platform, platformLog, distHome));
         String routedBackend = sameBackend(call.output);
 
         List<ProcessHandle> backends = backendProcesses(platform);

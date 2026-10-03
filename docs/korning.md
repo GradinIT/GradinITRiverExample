@@ -54,7 +54,7 @@ JAVA="${JAVA_HOME:-}/bin/java"
 
 Klienten skriver två rader `ORDER_OK` med samma `backendId`. Webbkonsolen kör tills den avslutas med Ctrl-C.
 
-Varje process som exporterar en tjänst får ett eget `instanceId` via `-Driver.instance=...`. Utan den blir id:t `0`, och `ServiceIdFile.defaultPath` pekar då på samma fil för alla processer med det id:t.
+Varje process som exporterar en tjänst får ett eget ServiceID. Nyckeln är Jini-namnet plus instans. Instansen kommer från `-Driver.instance` om den är satt, annars från filnamnet på config-argumentet (`config/order/order-backend/1.config` ger `order-backend-1`). Utan det delar alla processer filen för instans `0` och skriver över varandras registrering i lookup.
 
 ## JVM-flaggor
 
