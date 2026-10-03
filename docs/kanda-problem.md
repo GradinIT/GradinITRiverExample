@@ -12,7 +12,7 @@ GradinIT är ett personligt konto, så paket kan inte delas med det här repots 
 
 ## SLA och konfiguration
 
-`META-INF/SLA.xml` har namnrymden `urn:se:gradinit:river:sla` och rotelementet `component`. `META-INF/{namn}_conf.xml` har namnrymden `urn:se:gradinit:river:conf` och rotelementet `configuration`.
+`META-INF/SLA.xml` har namnrymden `urn:se:gradinit:river:sla` och rotelementet `component`. `META-INF/{namn}_conf.xml` har namnrymden `urn:se:gradinit:river:conf` och rotelementet `configuration`. Ett beroende skrivs som `depends` med attributen `interface` och `name`.
 
 `ComponentDescriptors` i plattformen sätter `SLA_NAMESPACE` till `urn:se:gradinit:river:sla` och `CONF_NAMESPACE` till `urn:se:gradinit:river:conf`, och läser rotelementen `component` respektive `configuration`.
 

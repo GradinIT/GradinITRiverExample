@@ -24,7 +24,7 @@ Publicerade artefakter, med sources- och javadoc-JAR:
 | `platform-bootstrap` | `PlatformMain`, startar plattformen, bland annat Reggie |
 | `platform-cli` | `river deploy`, `undeploy`, `list`, `status`, `monitor` |
 | `gradinit-river-all` | samlad körning med `PlatformMain` |
-| `gradinit-river-dist` | `bin/river-platform`, `bin/river`, `bin/river-web-console` |
+| `gradinit-river-dist` | `zip` med classifier `bin`: `bin/river-platform`, `bin/river`, `bin/river-web-console` |
 | `platform-deployer` | läser SLA och konfiguration |
 | `platform-supervisor` | startar om instanser med samma ServiceID |
 | `compat-rmi-activation` | patch för `java.rmi` på JDK 17+ |

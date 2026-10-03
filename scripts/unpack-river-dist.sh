@@ -25,14 +25,12 @@ MVN=(
 )
 
 attempts=(
+  "se.gradinit.river:gradinit-river-dist:${VERSION}:zip:bin"
+  "se.gradinit.river:gradinit-river-dist:${VERSION}:tar.gz:bin"
   "se.gradinit.river:gradinit-river-dist:${VERSION}:zip:dist"
   "se.gradinit.river:gradinit-river-dist:${VERSION}:tar.gz:dist"
   "se.gradinit.river:gradinit-river-dist:${VERSION}:zip"
   "se.gradinit.river:gradinit-river-dist:${VERSION}:tar.gz"
-  "se.gradinit.river:gradinit-river-dist:${VERSION}:zip:bin"
-  "se.gradinit.river:gradinit-river-dist:${VERSION}:tar.gz:bin"
-  "se.gradinit.river:gradinit-river-dist:${VERSION}:zip:assembly"
-  "se.gradinit.river:gradinit-river-dist:${VERSION}:tgz:dist"
 )
 
 found=""
