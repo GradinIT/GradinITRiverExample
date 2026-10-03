@@ -29,10 +29,10 @@ public final class OrderClient {
         ServiceDiscoveryManager manager = new ServiceDiscoveryManager(discovery, null);
         try {
             ServiceTemplate template = ServiceLookup.template(OrderService.class, "order");
-            ServiceItem item = manager.lookup(template, null, Duration.ofSeconds(30).toMillis());
+            ServiceItem item = manager.lookup(template, null, Duration.ofSeconds(60).toMillis());
             OrderService orders = item != null && item.service instanceof OrderService service ? service : null;
             if (orders == null) {
-                ServiceRegistrar registrar = ServiceLookup.awaitRegistrar(discovery, Duration.ofSeconds(30));
+                ServiceRegistrar registrar = ServiceLookup.awaitRegistrar(discovery, Duration.ofSeconds(60));
                 // lookup(ServiceTemplate) returns the proxy, not a ServiceItem.
                 Object found = registrar.lookup(template);
                 if (found instanceof OrderService service) {
@@ -46,7 +46,9 @@ public final class OrderClient {
             OrderConfirmation second = orders.place(request);
             System.out.println(format(first));
             System.out.println(format(second));
-            if (!first.backendId().equals(second.backendId())) {
+            boolean expectStable = Boolean.parseBoolean(
+                    System.getProperty("river.example.expectStableRoute", "true"));
+            if (expectStable && !first.backendId().equals(second.backendId())) {
                 throw new IllegalStateException("HRW gav olika backend för samma kund: "
                         + first.backendId() + " vs " + second.backendId());
             }

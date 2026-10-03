@@ -21,8 +21,10 @@ Publicerade artefakter, med sources- och javadoc-JAR:
 | `gradinit-river` | föräldra-POM |
 | `gradinit-river-bom` | versioner |
 | `platform-api` | `@ExportedService`, `@Routing`, `ServiceExporter`, `ServiceIdFile`, `HrwSelector`, `RoutingKeys` |
-| `platform-bootstrap` | startar plattformen, bland annat Reggie |
+| `platform-bootstrap` | `PlatformMain`, startar plattformen, bland annat Reggie |
 | `platform-cli` | `river deploy`, `undeploy`, `list`, `status`, `monitor` |
+| `gradinit-river-all` | samlad körning med `PlatformMain` |
+| `gradinit-river-dist` | `bin/river-platform`, `bin/river`, `bin/river-web-console` |
 | `platform-deployer` | läser SLA och konfiguration |
 | `platform-supervisor` | startar om instanser med samma ServiceID |
 | `compat-rmi-activation` | patch för `java.rmi` på JDK 17+ |

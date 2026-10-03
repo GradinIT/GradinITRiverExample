@@ -16,13 +16,11 @@ GradinIT är ett personligt konto, så paket kan inte delas med det här repots 
 
 `ComponentDescriptors` i plattformen sätter `SLA_NAMESPACE` till `urn:se:gradinit:river:sla` och `CONF_NAMESPACE` till `urn:se:gradinit:river:conf`, och läser rotelementen `component` respektive `configuration`.
 
-## `platform-bootstrap` har ingen startpunkt i den publicerade SNAPSHOT
+## Plattformen startas från distributionen
 
-`PlatformRuntime.activationClasses()` letar efter `compat-rmi-activation/target/classes` i GradinITRivers källträd och fungerar inte från ett konsumentrepo. En separat ändring i GradinITRiver lägger till `PlatformMain` med `Main-Class`, slår upp activation-jaren på klassökvägen och skriver `RIVER_PLATFORM_READY jini://host:port`. `OrderPlatformIT` är avstängt tills den SNAPSHOT finns. Exemplet startar inte `PlatformRuntime` själv.
+`PlatformRuntime.activationClasses()` letar efter `compat-rmi-activation/target/classes` i GradinITRivers källträd och fungerar inte från ett konsumentrepo. Den publicerade SNAPSHOT löser det med `PlatformMain`: `gradinit-river-dist` innehåller `bin/river-platform`, `bin/river` och `bin/river-web-console`. `bin/river-platform --clean` startar en tom plattform i en egen JVM och skriver `RIVER_PLATFORM_READY jini://host:port`. Skripten slår upp activation-jaren på klassökvägen. Exemplet startar inte `PlatformRuntime` själv.
 
-## `java -jar` räcker inte för CLI och bootstrap
-
-`platform-cli` och `platform-bootstrap` innehåller inte Jini-klasserna. `RiverCommand` refererar `net.jini.discovery.DiscoveryManagement` i `jsk-platform`. Starta dem med `-cp` och runtime-klassökvägen för `se.gradinit.river`, inte med `-jar` ensamt.
+`bin/river-platform` och `bin/river` är de startpunkter som ska användas. `java -jar` på `platform-cli` eller `platform-bootstrap` ser inte `jsk-platform`, och `RiverCommand` behöver `net.jini.discovery.DiscoveryManagement`. Exempelklienten startas fortfarande med egen klassökväg och JVM-flaggorna från `scripts/river-jvm-flags.sh`.
 
 ## Läget integrity
 

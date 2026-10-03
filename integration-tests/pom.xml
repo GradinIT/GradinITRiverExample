@@ -28,22 +28,6 @@
       <version>${project.version}</version>
     </dependency>
     <dependency>
-      <groupId>se.gradinit.river</groupId>
-      <artifactId>platform-bootstrap</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>se.gradinit.river</groupId>
-      <artifactId>platform-cli</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>se.gradinit.river</groupId>
-      <artifactId>jsk-platform</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>se.gradinit.river</groupId>
-      <artifactId>reggie</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
       <scope>test</scope>
@@ -53,44 +37,22 @@
   <build>
     <plugins>
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-dependency-plugin</artifactId>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>3.5.0</version>
         <executions>
           <execution>
-            <id>copy-platform-jars</id>
-            <phase>pre-integration-test</phase>
-            <goals>
-              <goal>copy</goal>
-            </goals>
-            <configuration>
-              <artifactItems>
-                <artifactItem>
-                  <groupId>se.gradinit.river</groupId>
-                  <artifactId>platform-bootstrap</artifactId>
-                  <version>${gradinit.river.version}</version>
-                  <destFileName>platform-bootstrap.jar</destFileName>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>se.gradinit.river</groupId>
-                  <artifactId>platform-cli</artifactId>
-                  <version>${gradinit.river.version}</version>
-                  <destFileName>platform-cli.jar</destFileName>
-                </artifactItem>
-              </artifactItems>
-              <outputDirectory>${project.build.directory}/river-jars</outputDirectory>
-              <overWriteSnapshots>true</overWriteSnapshots>
-            </configuration>
-          </execution>
-          <execution>
-            <id>platform-classpath</id>
+            <id>unpack-river-dist</id>
             <phase>package</phase>
             <goals>
-              <goal>build-classpath</goal>
+              <goal>exec</goal>
             </goals>
             <configuration>
-              <outputFile>${project.build.directory}/platform-classpath.txt</outputFile>
-              <includeGroupIds>se.gradinit.river</includeGroupIds>
-              <includeScope>runtime</includeScope>
+              <executable>bash</executable>
+              <arguments>
+                <argument>${project.basedir}/../scripts/unpack-river-dist.sh</argument>
+                <argument>${gradinit.river.version}</argument>
+              </arguments>
             </configuration>
           </execution>
         </executions>
@@ -102,14 +64,12 @@
           <includes>
             <include>**/*IT.java</include>
           </includes>
-          <forkedProcessTimeoutInSeconds>600</forkedProcessTimeoutInSeconds>
+          <forkedProcessTimeoutInSeconds>780</forkedProcessTimeoutInSeconds>
           <argLine>--patch-module java.rmi=${project.build.directory}/river-jvm/compat-rmi-activation.jar --add-exports java.rmi/java.rmi.activation=ALL-UNNAMED</argLine>
           <systemPropertyVariables>
             <gradinit.river.version>${gradinit.river.version}</gradinit.river.version>
-            <river.bootstrap.jar>${project.build.directory}/river-jars/platform-bootstrap.jar</river.bootstrap.jar>
-            <river.cli.jar>${project.build.directory}/river-jars/platform-cli.jar</river.cli.jar>
             <river.compat.jar>${project.build.directory}/river-jvm/compat-rmi-activation.jar</river.compat.jar>
-            <river.platform.classpath>${project.build.directory}/platform-classpath.txt</river.platform.classpath>
+            <river.dist.home.file>${project.build.directory}/river-dist-home.txt</river.dist.home.file>
           </systemPropertyVariables>
         </configuration>
         <executions>

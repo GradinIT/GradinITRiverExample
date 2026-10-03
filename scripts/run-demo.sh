@@ -1,107 +1,147 @@
 #!/usr/bin/env bash
-# Startar plattformen, deployar customer och order, anropar klienten, kör monitor och undeployar.
+# Startar plattformen från gradinit-river-dist, deployar customer och order,
+# anropar klienten, startar webbkonsolen och undeployar.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-VERSION="${GRADINIT_RIVER_VERSION:-3.0.0-gradinit-SNAPSHOT}"
-REPO="${M2_REPO:-${MAVEN_REPO_LOCAL:-$HOME/.m2/repository}}"
-RIVER="$REPO/se/gradinit/river"
 LOGS="$ROOT/target/demo-logs"
 mkdir -p "$LOGS"
 
-jar_of() {
-  local artifact="$1"
-  local dir="$RIVER/${artifact}/${VERSION}"
-  local newest=""
-  local newest_time=0
-  shopt -s nullglob
-  for jar in "$dir"/${artifact}-*.jar; do
-    case "$jar" in
-      *-sources.jar|*-javadoc.jar|*-tests.jar) continue ;;
-    esac
-    local mtime
-    if mtime=$(stat -c %Y "$jar" 2>/dev/null); then
-      :
-    else
-      mtime=$(stat -f %m "$jar")
-    fi
-    if (( mtime > newest_time )); then
-      newest="$jar"
-      newest_time=$mtime
-    fi
-  done
-  if [[ -z "$newest" ]]; then
-    echo "Saknar ${artifact} ${VERSION} under ${dir}." >&2
-    echo "Konfigurera GitHub Packages (server-id github) och kör ./mvnw -B -U package. Se docs/beroenden.md." >&2
+echo "Bygger exemplet och packar upp gradinit-river-dist"
+(cd "$ROOT" && ./mvnw -B -U -DskipITs package)
+
+HOME_FILE="$ROOT/integration-tests/target/river-dist-home.txt"
+if [[ ! -s "$HOME_FILE" ]]; then
+  echo "Saknar $HOME_FILE" >&2
+  exit 1
+fi
+DIST="$(tr -d '\n' < "$HOME_FILE")"
+PLATFORM="$DIST/bin/river-platform"
+RIVER="$DIST/bin/river"
+CONSOLE="$DIST/bin/river-web-console"
+for script in "$PLATFORM" "$RIVER" "$CONSOLE"; do
+  if [[ ! -e "$script" ]]; then
+    echo "Saknar $script" >&2
     exit 1
   fi
-  printf '%s\n' "$newest"
-}
+  chmod u+x "$script" || true
+done
 
-mapfile -t FLAGS < <("$ROOT/scripts/river-jvm-flags.sh")
 JAVA="${JAVA_HOME:-}/bin/java"
 if [[ ! -x "$JAVA" ]]; then
   JAVA="$(command -v java)"
 fi
-
-BOOTSTRAP="$(jar_of platform-bootstrap)"
-CLI="$(jar_of platform-cli)"
-
-main_class() {
-  local jar="$1"
-  local main
-  main="$(unzip -p "$jar" META-INF/MANIFEST.MF | tr -d '\r' | awk '/^Main-Class:/{print $2; exit}')"
-  if [[ -z "$main" ]]; then
-    echo "Ingen Main-Class i $jar." >&2
-    echo "platform-bootstrap behöver PlatformMain i den publicerade SNAPSHOT (RIVER_PLATFORM_READY)." >&2
-    exit 1
-  fi
-  printf '%s\n' "$main"
-}
-
-echo "Bygger exemplet"
-(cd "$ROOT" && ./mvnw -B -U -DskipITs package)
-
-PLATFORM_CP_FILE="$ROOT/integration-tests/target/platform-classpath.txt"
-if [[ ! -s "$PLATFORM_CP_FILE" ]]; then
-  echo "Saknar $PLATFORM_CP_FILE" >&2
-  exit 1
-fi
-PLATFORM_CP="$(tr -d '\n' < "$PLATFORM_CP_FILE")"
-BOOT_MAIN="$(main_class "$BOOTSTRAP")"
-CLI_MAIN="$(main_class "$CLI")"
+mapfile -t FLAGS < <("$ROOT/scripts/river-jvm-flags.sh")
 
 CUSTOMER="$ROOT/customer-component/target/customer-component-1.0.0.jar"
 ORDER="$ROOT/order-component/target/order-component-1.0.0.jar"
 CLIENT="$ROOT/client/target/client-1.0.0.jar"
 CP="$(cat "$ROOT/client/target/classpath.txt")"
 
+BOOT_PID=""
+CONSOLE_PID=""
+
+kill_tree() {
+  local pid="$1"
+  if [[ -z "$pid" ]]; then
+    return
+  fi
+  local kid
+  for kid in $(pgrep -P "$pid" || true); do
+    kill_tree "$kid"
+  done
+  kill "$pid" 2>/dev/null || true
+}
+
 cleanup() {
-  if [[ -n "${BOOT_PID:-}" ]] && kill -0 "$BOOT_PID" 2>/dev/null; then
-    kill "$BOOT_PID" || true
-    wait "$BOOT_PID" || true
+  if [[ -n "${CONSOLE_PID:-}" ]]; then
+    kill_tree "$CONSOLE_PID"
+    wait "$CONSOLE_PID" 2>/dev/null || true
+  fi
+  if [[ -n "${BOOT_PID:-}" ]]; then
+    kill_tree "$BOOT_PID"
+    wait "$BOOT_PID" 2>/dev/null || true
   fi
 }
 trap cleanup EXIT
 
-echo "Startar platform-bootstrap ($BOOT_MAIN)"
-"$JAVA" "${FLAGS[@]}" -cp "$PLATFORM_CP" "$BOOT_MAIN" >"$LOGS/bootstrap.log" 2>&1 &
+run_script() {
+  local script="$1"
+  shift
+  if [[ -x "$script" ]]; then
+    "$script" "$@"
+  else
+    bash "$script" "$@"
+  fi
+}
+
+echo "Startar bin/river-platform --clean"
+run_script "$PLATFORM" --clean >"$LOGS/platform.log" 2>&1 &
 BOOT_PID=$!
-sleep 15
+
+locator=""
+for _ in $(seq 1 120); do
+  if [[ -f "$LOGS/platform.log" ]]; then
+    line="$(grep -E 'RIVER_PLATFORM_READY[[:space:]]+jini://' "$LOGS/platform.log" | head -n 1 || true)"
+    locator="$(printf '%s\n' "$line" | grep -oE 'jini://[^[:space:]]+' | head -n 1 || true)"
+    locator="${locator%.}"
+    case "$locator" in
+      jini://0.0.0.0:*) locator="jini://127.0.0.1:${locator#jini://0.0.0.0:}" ;;
+    esac
+    if [[ -n "$locator" ]]; then
+      break
+    fi
+  fi
+  if ! kill -0 "$BOOT_PID" 2>/dev/null; then
+    echo "bin/river-platform avslutades innan RIVER_PLATFORM_READY" >&2
+    cat "$LOGS/platform.log" >&2 || true
+    exit 1
+  fi
+  sleep 1
+done
+if [[ -z "$locator" ]]; then
+  echo "Timeout. Ingen RIVER_PLATFORM_READY i $LOGS/platform.log" >&2
+  cat "$LOGS/platform.log" >&2 || true
+  exit 1
+fi
+echo "Lookup $locator"
+export JAVA_TOOL_OPTIONS="-Dse.gradinit.river.lookup=${locator}"
 
 river() {
   echo "+ river $*"
-  "$JAVA" "${FLAGS[@]}" -cp "$PLATFORM_CP" "$CLI_MAIN" "$@"
+  run_script "$RIVER" "$@"
 }
 
 river deploy "$CUSTOMER"
 river deploy "$ORDER"
 river list || true
 river status || true
-river monitor
+river monitor >"$LOGS/monitor.log" 2>&1 &
+MONITOR_PID=$!
+sleep 5
+kill_tree "$MONITOR_PID"
+wait "$MONITOR_PID" 2>/dev/null || true
+
+echo "Startar bin/river-web-console"
+run_script "$CONSOLE" >"$LOGS/web-console.log" 2>&1 &
+CONSOLE_PID=$!
+sleep 3
+if kill -0 "$CONSOLE_PID" 2>/dev/null; then
+  echo "Webbkonsolen kör. Logg: $LOGS/web-console.log"
+else
+  console_status=0
+  wait "$CONSOLE_PID" || console_status=$?
+  echo "bin/river-web-console avslutades (status ${console_status}). Logg:" >&2
+  cat "$LOGS/web-console.log" >&2 || true
+  CONSOLE_PID=""
+  if [[ "$console_status" -ne 0 ]]; then
+    exit 1
+  fi
+fi
 
 echo "Anropar klienten"
-"$JAVA" "${FLAGS[@]}" -cp "$CLIENT:$CP" se.gradinit.riverexample.client.OrderClient alice SKU-100 1
+"$JAVA" "${FLAGS[@]}" -Dse.gradinit.river.lookup="$locator" \
+  -cp "$CLIENT:$CP" se.gradinit.riverexample.client.OrderClient alice SKU-100 1
 
 if ! river undeploy order; then
   river undeploy "$ORDER"
