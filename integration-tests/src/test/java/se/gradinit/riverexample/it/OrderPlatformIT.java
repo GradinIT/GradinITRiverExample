@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,7 +26,11 @@ import org.junit.jupiter.api.Timeout;
  * failover onto another backend, then undeploys.
  *
  * <p>The platform script and the supervisor pass {@code --patch-module} and {@code --add-exports}.
- * This test does not put those flags in {@code JDK_JAVA_OPTIONS}.
+ * This test does not put those flags in {@code JDK_JAVA_OPTIONS} or {@code JAVA_TOOL_OPTIONS}.
+ *
+ * <p>The child classpath is the distribution classpath: {@code lib/*.jar} plus {@code examples/*.jar}.
+ * Deploy reads the SLA from the given jar, but the supervisor does not add that path. The jars are
+ * copied into {@code examples/} before {@code bin/river-platform} starts.
  */
 class OrderPlatformIT {
     private static final Pattern READY = Pattern.compile("RIVER_PLATFORM_READY\\s+(jini://\\S+)");
@@ -69,6 +74,7 @@ class OrderPlatformIT {
         Path logs = repoRoot.resolve("integration-tests/target/platform-logs");
         Files.createDirectories(logs);
         Path platformLog = logs.resolve("platform.log");
+        installOnPlatformClasspath(distHome, customerJar, orderJar);
         platform = start(platformLog, distHome, Map.of(), command(platformBin, "--clean"));
         String locator = awaitReady(platform, platformLog, Duration.ofSeconds(120));
         assertNotNull(locator, "plattformen blev inte RIVER_PLATFORM_READY\n" + read(platformLog)
@@ -76,8 +82,8 @@ class OrderPlatformIT {
         locator = usableLocator(locator);
 
         // bin/river parses `java -version`. JAVA_TOOL_OPTIONS adds a "Picked up" line and the
-// script then rejects the JDK. The client gets the locator with -D on its own command line.
-Map<String, String> lookupEnv = Map.of();
+        // script then rejects the JDK. The client gets the locator with -D on its own command line.
+        Map<String, String> lookupEnv = Map.of();
 
         CommandResult deployedCustomer = river(logs, distHome, riverBin, lookupEnv, "deploy", customerJar.toString());
         assertEquals(0, deployedCustomer.exit, deployedCustomer.output + diagnostics(platform, platformLog, distHome));
@@ -141,6 +147,14 @@ Map<String, String> lookupEnv = Map.of();
             undeployCustomer = river(logs, distHome, riverBin, lookupEnv, "undeploy", customerJar.toString());
         }
         assertEquals(0, undeployCustomer.exit, undeployCustomer.output);
+    }
+
+    private static void installOnPlatformClasspath(Path distHome, Path... jars) throws IOException {
+        Path examples = distHome.resolve("examples");
+        Files.createDirectories(examples);
+        for (Path jar : jars) {
+            Files.copy(jar, examples.resolve(jar.getFileName()), StandardCopyOption.REPLACE_EXISTING);
+        }
     }
 
     private static Path distHome() throws IOException {
@@ -416,8 +430,27 @@ Map<String, String> lookupEnv = Map.of();
             env = env.substring(0, 4000);
         }
         return "\n--- platform ---\n" + log
+                + "\n--- component logs ---\n" + componentLogs(distHome)
                 + "\n--- _river-env.sh ---\n" + env
                 + "\n--- processes ---\n" + describeProcesses(platformProcess);
+    }
+
+    private static String componentLogs(Path distHome) throws IOException {
+        Path dir = distHome.resolve("river-platform/logs");
+        if (!Files.isDirectory(dir)) {
+            return "(saknar " + dir + ")";
+        }
+        StringBuilder text = new StringBuilder();
+        try (var stream = Files.list(dir)) {
+            for (Path log : stream.filter(Files::isRegularFile).sorted().toList()) {
+                String body = read(log);
+                if (body.length() > 4000) {
+                    body = body.substring(body.length() - 4000);
+                }
+                text.append("\n--- ").append(log.getFileName()).append(" ---\n").append(body);
+            }
+        }
+        return text.isEmpty() ? "(inga loggar)" : text.toString();
     }
 
     private static void destroyTree(Process process) {

@@ -41,8 +41,14 @@ Kräver JDK 25 eller senare, och läsrättighet till paketen på `https://maven.
 
 3. Starta en tom plattform i en terminal. Vänta på raden `RIVER_PLATFORM_READY jini://host:port`.
 
+   Barn-JVM:en får distributionens klassökväg: `lib/*.jar` och `examples/*.jar`. `bin/river deploy` läser SLA från jar-filen, men lägger inte den sökvägen på klassökvägen. Kopiera därför komponenterna till `examples/` innan plattformen startar.
+
    ```bash
    DIST="$(cat integration-tests/target/river-dist-home.txt)"
+   mkdir -p "$DIST/examples"
+   cp customer-component/target/customer-component-1.0.0.jar \
+      order-component/target/order-component-1.0.0.jar \
+      "$DIST/examples/"
    "$DIST/bin/river-platform" --clean
    ```
 

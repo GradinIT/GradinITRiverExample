@@ -75,6 +75,9 @@ run_script() {
   fi
 }
 
+mkdir -p "$DIST/examples"
+cp -f "$CUSTOMER" "$ORDER" "$DIST/examples/"
+
 echo "Startar bin/river-platform --clean"
 run_script "$PLATFORM" --clean >"$LOGS/platform.log" 2>&1 &
 BOOT_PID=$!

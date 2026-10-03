@@ -12,6 +12,8 @@ GradinIT är ett personligt konto, så paket kan inte delas med det här repots 
 
 `bin/river-platform` sätter `--patch-module` och `--add-exports` på sin egen JVM, och supervisorn skickar samma flaggor till komponenternas barn-JVM. Lägg dem inte också i `JDK_JAVA_OPTIONS`. Då patchas `java.rmi` två gånger och barn-JVM:en startar inte.
 
+Barn-JVM:ens klassökväg är distributionens `lib/*.jar` och `examples/*.jar`, inte jar-filen som ges till `bin/river deploy`. Kopiera komponentjarren till `examples/` innan `bin/river-platform` startar, annars hittas inte `mainClass`.
+
 ## SLA och konfiguration
 
 `META-INF/SLA.xml` har namnrymden `urn:se:gradinit:river:sla` och rotelementet `component`. `META-INF/{namn}_conf.xml` har namnrymden `urn:se:gradinit:river:conf` och rotelementet `configuration`. Ett beroende skrivs som `depends` med attributen `interface` och `name`.

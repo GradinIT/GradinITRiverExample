@@ -27,8 +27,14 @@ Skriptet gör samma steg och skriver loggarna till `target/demo-logs`. Motsvaran
 ```bash
 ./mvnw -B -U -DskipITs package
 DIST="$(cat integration-tests/target/river-dist-home.txt)"
+mkdir -p "$DIST/examples"
+cp customer-component/target/customer-component-1.0.0.jar \
+   order-component/target/order-component-1.0.0.jar \
+   "$DIST/examples/"
 "$DIST/bin/river-platform" --clean
 ```
+
+Supervisorn startar `mainClass` med samma klassökväg som `bin/river-platform`: `lib/*.jar` plus `examples/*.jar`. Utan kopian ovan saknas `CustomerMain` och instansen avslutas direkt.
 
 Vänta på `RIVER_PLATFORM_READY jini://host:port`. Fortsätt i en annan terminal. Sätt inte `JAVA_TOOL_OPTIONS`. `bin/river` läser `java -version`, och en `Picked up`-rad gör att den kontrollen faller.
 
