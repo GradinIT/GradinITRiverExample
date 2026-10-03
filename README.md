@@ -41,15 +41,20 @@ Kräver JDK 25 eller senare, och läsrättighet till paketen på `https://maven.
 
 3. Starta en tom plattform i en terminal. Vänta på raden `RIVER_PLATFORM_READY jini://host:port`.
 
+   Barn-JVM:en får distributionens klassökväg: `lib/*.jar` och `examples/*.jar`. `bin/river deploy` läser SLA från jar-filen, men lägger inte den sökvägen på klassökvägen. Kopiera därför komponenterna till `examples/` innan plattformen startar.
+
    ```bash
    DIST="$(cat integration-tests/target/river-dist-home.txt)"
+   mkdir -p "$DIST/examples"
+   cp customer-component/target/customer-component-1.0.0.jar \
+      order-component/target/order-component-1.0.0.jar \
+      "$DIST/examples/"
    "$DIST/bin/river-platform" --clean
    ```
 
 4. Deploya komponenterna i en annan terminal. Byt `jini://host:port` mot URL:en från steg 3.
 
    ```bash
-   export JAVA_TOOL_OPTIONS="-Dse.gradinit.river.lookup=jini://host:port"
    "$DIST/bin/river" deploy customer-component/target/customer-component-1.0.0.jar
    "$DIST/bin/river" deploy order-component/target/order-component-1.0.0.jar
    ```
@@ -68,7 +73,6 @@ Kräver JDK 25 eller senare, och läsrättighet till paketen på `https://maven.
 6. Starta webbkonsolen i en tredje terminal, mot samma plattform. Avsluta den med Ctrl-C.
 
    ```bash
-   export JAVA_TOOL_OPTIONS="-Dse.gradinit.river.lookup=jini://host:port"
    "$DIST/bin/river-web-console"
    ```
 
@@ -85,7 +89,7 @@ Enhetstesterna:
 ./mvnw -B -U verify
 ```
 
-`OrderPlatformIT` är avstängt tills GradinITRivers supervisor skickar `--patch-module` och `--add-exports` till komponenternas barn-JVM. Den ändringen görs uppströms. Snabbstarten ovan är flödet när den SNAPSHOT finns. `./scripts/run-demo.sh` gör samma steg.
+`OrderPlatformIT` kör samma flöde, inklusive routing och failover. `./scripts/run-demo.sh` gör det också. Supervisorn skickar `--patch-module` och `--add-exports` till komponenternas barn-JVM. De flaggorna ska inte också ligga i `JDK_JAVA_OPTIONS`. Sätt inte `JAVA_TOOL_OPTIONS` när du kör `bin/river`: skriptet läser `java -version`, och raden `Picked up JAVA_TOOL_OPTIONS` gör att den kontrollen faller. Klienten får lookup-URL:en med `-Dse.gradinit.river.lookup`.
 
 JVM-flaggorna `--patch-module java.rmi=...` och `--add-exports java.rmi/java.rmi.activation=ALL-UNNAMED` behövs för exempelklienten. `bin/river-platform` och `bin/river` sätter dem själva. Steg för steg finns i [docs/korning.md](docs/korning.md).
 

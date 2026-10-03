@@ -12,7 +12,7 @@ Följ [beroenden.md](beroenden.md): server-id `github` i `~/.m2/settings.xml`, t
 ./mvnw -B -U verify
 ```
 
-`verify` kör enhetstesterna. `OrderPlatformIT` är avstängt tills GradinITRivers supervisor skickar `--patch-module` och `--add-exports` till komponenternas barn-JVM. Det åtgärdas uppströms. När den SNAPSHOT är publicerad startar testet `bin/river-platform --clean`, väntar på `RIVER_PLATFORM_READY jini://host:port`, deployar customer och order med `bin/river`, anropar klienten, kontrollerar routing och failover, och undeployar.
+`verify` kör enhetstesterna och `OrderPlatformIT`. Testet packar upp `gradinit-river-dist` (`zip`, classifier `bin`), startar `bin/river-platform --clean` i en egen JVM, väntar på `RIVER_PLATFORM_READY jini://host:port`, deployar customer och order med `bin/river`, anropar klienten, kontrollerar routing och failover, och undeployar. `-U` hämtar senaste `3.0.0-gradinit-SNAPSHOT`.
 
 Om Maven inte kan hämta `se.gradinit.river:gradinit-river-bom:3.0.0-gradinit-SNAPSHOT` eller `gradinit-river-dist` saknas token i `settings.xml` eller hemligheten `GRADINIT_PACKAGES_TOKEN` i Actions.
 
@@ -27,13 +27,18 @@ Skriptet gör samma steg och skriver loggarna till `target/demo-logs`. Motsvaran
 ```bash
 ./mvnw -B -U -DskipITs package
 DIST="$(cat integration-tests/target/river-dist-home.txt)"
+mkdir -p "$DIST/examples"
+cp customer-component/target/customer-component-1.0.0.jar \
+   order-component/target/order-component-1.0.0.jar \
+   "$DIST/examples/"
 "$DIST/bin/river-platform" --clean
 ```
 
-Vänta på `RIVER_PLATFORM_READY jini://host:port`. Sätt lookup-URL:en och fortsätt i en annan terminal:
+Supervisorn startar `mainClass` med samma klassökväg som `bin/river-platform`: `lib/*.jar` plus `examples/*.jar`. Utan kopian ovan saknas `CustomerMain` och instansen avslutas direkt.
+
+Vänta på `RIVER_PLATFORM_READY jini://host:port`. Fortsätt i en annan terminal. Sätt inte `JAVA_TOOL_OPTIONS`. `bin/river` läser `java -version`, och en `Picked up`-rad gör att den kontrollen faller.
 
 ```bash
-export JAVA_TOOL_OPTIONS="-Dse.gradinit.river.lookup=jini://host:port"
 "$DIST/bin/river" deploy customer-component/target/customer-component-1.0.0.jar
 "$DIST/bin/river" deploy order-component/target/order-component-1.0.0.jar
 "$DIST/bin/river-web-console"
@@ -49,7 +54,7 @@ JAVA="${JAVA_HOME:-}/bin/java"
 
 Klienten skriver två rader `ORDER_OK` med samma `backendId`. Webbkonsolen kör tills den avslutas med Ctrl-C.
 
-Varje process som exporterar en tjänst får ett eget `instanceId` via `-Driver.instance=...`. Utan den blir id:t `0`, och `ServiceIdFile.defaultPath` pekar då på samma fil för alla processer med det id:t.
+Varje process som exporterar en tjänst får ett eget ServiceID. Nyckeln är Jini-namnet plus instans. Instansen kommer från `-Driver.instance` om den är satt, annars från filnamnet på config-argumentet (`config/order/order-backend/1.config` ger `order-backend-1`). Utan det delar alla processer filen för instans `0` och skriver över varandras registrering i lookup.
 
 ## JVM-flaggor
 
