@@ -10,7 +10,7 @@ GradinIT är ett personligt konto, så paket kan inte delas med det här repots 
 
 `--patch-module java.rmi=...` och `--add-exports java.rmi/java.rmi.activation=ALL-UNNAMED` behövs på JDK 25 och 26. De kommer från `compat-rmi-activation`. SNAPSHOT-jaren i det lokala repot är tidsstämplade, så sökvägen kan inte hårdkodas mot `artifact-3.0.0-gradinit-SNAPSHOT.jar`.
 
-`bin/river-platform` sätter redan `--patch-module` och `--add-exports` på sin egen JVM. Samma flaggor får inte också ligga i `JDK_JAVA_OPTIONS`, för då patchas `java.rmi` två gånger och JVM:en startar inte.
+`bin/river-platform` sätter redan `--patch-module` och `--add-exports` på sin egen JVM. Supervisorn i den publicerade SNAPSHOT skickar inte de flaggorna vidare till komponenternas barn-JVM, så en deployad komponent kan inte ladda `java.rmi.activation`. Det åtgärdas uppströms i GradinITRiver. `OrderPlatformIT` är avstängt tills den SNAPSHOT finns. Exemplet sätter inte flaggorna åt barnprocesserna.
 
 ## SLA och konfiguration
 

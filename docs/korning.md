@@ -12,7 +12,7 @@ Följ [beroenden.md](beroenden.md): server-id `github` i `~/.m2/settings.xml`, t
 ./mvnw -B -U verify
 ```
 
-`verify` kör enhetstester och `OrderPlatformIT`. Testet packar upp `gradinit-river-dist`, startar `bin/river-platform --clean` i en egen JVM, väntar på `RIVER_PLATFORM_READY jini://host:port`, deployar customer och order med `bin/river`, anropar klienten, kontrollerar att samma kund träffar samma backend, stoppar en backend och kontrollerar att ett nytt anrop går igenom, och undeployar.
+`verify` kör enhetstesterna. `OrderPlatformIT` är avstängt tills GradinITRivers supervisor skickar `--patch-module` och `--add-exports` till komponenternas barn-JVM. Det åtgärdas uppströms. När den SNAPSHOT är publicerad startar testet `bin/river-platform --clean`, väntar på `RIVER_PLATFORM_READY jini://host:port`, deployar customer och order med `bin/river`, anropar klienten, kontrollerar routing och failover, och undeployar.
 
 Om Maven inte kan hämta `se.gradinit.river:gradinit-river-bom:3.0.0-gradinit-SNAPSHOT` eller `gradinit-river-dist` saknas token i `settings.xml` eller hemligheten `GRADINIT_PACKAGES_TOKEN` i Actions.
 

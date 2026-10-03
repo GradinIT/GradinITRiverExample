@@ -79,13 +79,13 @@ Kräver JDK 25 eller senare, och läsrättighet till paketen på `https://maven.
    "$DIST/bin/river" undeploy customer
    ```
 
-Hela flödet, inklusive routing och failover, körs av integrationstestet:
+Enhetstesterna:
 
 ```bash
 ./mvnw -B -U verify
 ```
 
-`./scripts/run-demo.sh` gör samma sak: bygger med `-U`, startar `bin/river-platform --clean`, deployar med `bin/river`, anropar klienten, startar `bin/river-web-console` och undeployar.
+`OrderPlatformIT` är avstängt tills GradinITRivers supervisor skickar `--patch-module` och `--add-exports` till komponenternas barn-JVM. Den ändringen görs uppströms. Snabbstarten ovan är flödet när den SNAPSHOT finns. `./scripts/run-demo.sh` gör samma steg.
 
 JVM-flaggorna `--patch-module java.rmi=...` och `--add-exports java.rmi/java.rmi.activation=ALL-UNNAMED` behövs för exempelklienten. `bin/river-platform` och `bin/river` sätter dem själva. Steg för steg finns i [docs/korning.md](docs/korning.md).
 
