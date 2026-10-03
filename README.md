@@ -85,7 +85,7 @@ Enhetstesterna:
 ./mvnw -B -U verify
 ```
 
-`OrderPlatformIT` är avstängt tills GradinITRivers supervisor skickar `--patch-module` och `--add-exports` till komponenternas barn-JVM. Den ändringen görs uppströms. Snabbstarten ovan är flödet när den SNAPSHOT finns. `./scripts/run-demo.sh` gör samma steg.
+`OrderPlatformIT` kör samma flöde, inklusive routing och failover. `./scripts/run-demo.sh` gör det också. Supervisorn skickar `--patch-module` och `--add-exports` till komponenternas barn-JVM. De flaggorna ska inte också ligga i `JDK_JAVA_OPTIONS`.
 
 JVM-flaggorna `--patch-module java.rmi=...` och `--add-exports java.rmi/java.rmi.activation=ALL-UNNAMED` behövs för exempelklienten. `bin/river-platform` och `bin/river` sätter dem själva. Steg för steg finns i [docs/korning.md](docs/korning.md).
 

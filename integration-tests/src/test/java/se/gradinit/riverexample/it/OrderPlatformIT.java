@@ -16,7 +16,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -25,11 +24,9 @@ import org.junit.jupiter.api.Timeout;
  * deploys customer and order with {@code bin/river}, calls the client, checks HRW routing and
  * failover onto another backend, then undeploys.
  *
- * <p>Skipped until the GradinITRiver supervisor passes {@code --patch-module} and
- * {@code --add-exports} to component child JVMs. That fix is upstream; this example does not
- * supply the flags itself.
+ * <p>The platform script and the supervisor pass {@code --patch-module} and {@code --add-exports}.
+ * This test does not put those flags in {@code JDK_JAVA_OPTIONS}.
  */
-@Disabled("Supervisorn i publicerad GradinITRiver skickar inte --patch-module/--add-exports till komponenternas barn-JVM. Det åtgärdas uppströms. Testet slås på när den SNAPSHOT är publicerad.")
 class OrderPlatformIT {
     private static final Pattern READY = Pattern.compile("RIVER_PLATFORM_READY\\s+(jini://\\S+)");
 
