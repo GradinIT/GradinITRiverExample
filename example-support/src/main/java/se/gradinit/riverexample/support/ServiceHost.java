@@ -20,10 +20,10 @@ public final class ServiceHost {
 
     private ServiceHost() {}
 
-    public static void serve(Object implementation) throws Exception {
+    public static void serve(Object implementation, String... args) throws Exception {
         ServiceExporter.requireExported(implementation);
-        String instanceId = instanceId();
-        Path serviceIdFile = ServiceIdFile.defaultPath(instanceId);
+        String instanceId = instanceId(args);
+        Path serviceIdFile = ServiceIdFile.defaultPath(serviceIdKey(implementation, instanceId));
         if (ServiceIdFile.exists(serviceIdFile)) {
             ServiceID existing = ServiceIdFile.read(serviceIdFile);
             ServiceIdFile.write(serviceIdFile, existing);
@@ -73,11 +73,39 @@ public final class ServiceHost {
         }
     }
 
-    static String instanceId() {
+    /**
+     * Instance index from {@code -Driver.instance}, otherwise the stem of the
+     * supervisor config argument ({@code order-backend/1.config} → {@code 1}).
+     * A shared default of {@code 0} would make every component reuse one ServiceID.
+     */
+    static String instanceId(String... args) {
         String configured = System.getProperty("river.instance");
         if (configured != null && !configured.isBlank()) {
             return configured;
         }
-        return "0";
+        if (args != null) {
+            for (String arg : args) {
+                if (arg == null || arg.isBlank()) {
+                    continue;
+                }
+                String fileName = Path.of(arg).getFileName().toString();
+                String suffix = ".config";
+                if (fileName.endsWith(suffix) && fileName.length() > suffix.length()) {
+                    return fileName.substring(0, fileName.length() - suffix.length());
+                }
+            }
+        }
+        return Long.toString(ProcessHandle.current().pid());
+    }
+
+    /** Jini name plus instance, so customer/0 and order-backend/0 do not share a file. */
+    static String serviceIdKey(Object implementation, String instanceId) {
+        ExportedService marked = implementation.getClass().getAnnotation(ExportedService.class);
+        String name = marked == null ? "" : marked.name();
+        if (name == null || name.isBlank()) {
+            name = implementation.getClass().getSimpleName();
+        }
+        String instance = instanceId == null || instanceId.isBlank() ? "0" : instanceId;
+        return (name + "-" + instance).replaceAll("[^A-Za-z0-9._-]", "-");
     }
 }

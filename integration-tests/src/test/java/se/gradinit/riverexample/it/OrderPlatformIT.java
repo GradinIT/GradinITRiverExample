@@ -16,7 +16,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -25,11 +24,14 @@ import org.junit.jupiter.api.Timeout;
  * deploys customer and order with {@code bin/river}, calls the client, checks HRW routing and
  * failover onto another backend, then undeploys.
  *
- * <p>Skipped until the GradinITRiver supervisor passes {@code --patch-module} and
- * {@code --add-exports} to component child JVMs. That fix is upstream; this example does not
- * supply the flags itself.
+ * <p>The platform script and the supervisor pass {@code --patch-module} and {@code --add-exports}.
+ * This test does not put those flags in {@code JDK_JAVA_OPTIONS}. The dist scripts skip
+ * {@code Picked up JAVA_TOOL_OPTIONS} and {@code Picked up JDK_JAVA_OPTIONS} when they read
+ * {@code java -version}.
+ *
+ * <p>Child JVMs get the deployed component jar and the jars of components it {@code depends} on.
+ * This test does not copy those jars into {@code examples/}.
  */
-@Disabled("Supervisorn i publicerad GradinITRiver skickar inte --patch-module/--add-exports till komponenternas barn-JVM. Det åtgärdas uppströms. Testet slås på när den SNAPSHOT är publicerad.")
 class OrderPlatformIT {
     private static final Pattern READY = Pattern.compile("RIVER_PLATFORM_READY\\s+(jini://\\S+)");
 
@@ -78,8 +80,9 @@ class OrderPlatformIT {
                 + "\n--- bin/river-platform ---\n" + scriptHead(platformBin));
         locator = usableLocator(locator);
 
-        Map<String, String> lookupEnv = Map.of(
-                "JAVA_TOOL_OPTIONS", "-Dse.gradinit.river.lookup=" + locator);
+        // The client gets the locator with -D on its own command line. Do not put the activation
+        // flags in JDK_JAVA_OPTIONS; the supervisor already passes them to child JVMs.
+        Map<String, String> lookupEnv = Map.of();
 
         CommandResult deployedCustomer = river(logs, distHome, riverBin, lookupEnv, "deploy", customerJar.toString());
         assertEquals(0, deployedCustomer.exit, deployedCustomer.output + diagnostics(platform, platformLog, distHome));
@@ -97,7 +100,7 @@ class OrderPlatformIT {
         List<String> jvm = jvmFlags(compatJar);
         String clientClasspath = clientJar + System.getProperty("path.separator") + Files.readString(classpathFile).trim();
         CommandResult call = client(logs.resolve("client.log"), repoRoot, jvm, locator, clientClasspath);
-        assertEquals(0, call.exit, call.output);
+        assertEquals(0, call.exit, call.output + diagnostics(platform, platformLog, distHome));
         String routedBackend = sameBackend(call.output);
 
         List<ProcessHandle> backends = backendProcesses(platform);
@@ -418,8 +421,27 @@ class OrderPlatformIT {
             env = env.substring(0, 4000);
         }
         return "\n--- platform ---\n" + log
+                + "\n--- component logs ---\n" + componentLogs(distHome)
                 + "\n--- _river-env.sh ---\n" + env
                 + "\n--- processes ---\n" + describeProcesses(platformProcess);
+    }
+
+    private static String componentLogs(Path distHome) throws IOException {
+        Path dir = distHome.resolve("river-platform/logs");
+        if (!Files.isDirectory(dir)) {
+            return "(saknar " + dir + ")";
+        }
+        StringBuilder text = new StringBuilder();
+        try (var stream = Files.list(dir)) {
+            for (Path log : stream.filter(Files::isRegularFile).sorted().toList()) {
+                String body = read(log);
+                if (body.length() > 4000) {
+                    body = body.substring(body.length() - 4000);
+                }
+                text.append("\n--- ").append(log.getFileName()).append(" ---\n").append(body);
+            }
+        }
+        return text.isEmpty() ? "(inga loggar)" : text.toString();
     }
 
     private static void destroyTree(Process process) {

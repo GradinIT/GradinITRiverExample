@@ -19,7 +19,20 @@ import se.gradinit.riverexample.support.ServiceLookup;
 public final class OrderClient {
     private OrderClient() {}
 
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) {
+        int status = 0;
+        try {
+            placeTwice(args);
+        } catch (Throwable failure) {
+            failure.printStackTrace(System.err);
+            status = 1;
+        }
+        // LookupDiscoveryManager leaves non-daemon threads behind. terminate() can
+        // block, so a one-shot client exits instead of waiting for those threads.
+        System.exit(status);
+    }
+
+    private static void placeTwice(String[] args) throws Exception {
         String customerId = args.length > 0 ? args[0] : "alice";
         String sku = args.length > 1 ? args[1] : "SKU-100";
         int quantity = args.length > 2 ? Integer.parseInt(args[2]) : 1;
@@ -53,8 +66,22 @@ public final class OrderClient {
                         + first.backendId() + " vs " + second.backendId());
             }
         } finally {
+            Thread cleanup = new Thread(() -> closeQuietly(manager, discovery));
+            cleanup.setDaemon(true);
+            cleanup.start();
+        }
+    }
+
+    private static void closeQuietly(ServiceDiscoveryManager manager, DiscoveryManagement discovery) {
+        try {
             manager.terminate();
+        } catch (Exception ignored) {
+            // process is exiting
+        }
+        try {
             discovery.terminate();
+        } catch (Exception ignored) {
+            // process is exiting
         }
     }
 

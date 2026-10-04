@@ -6,6 +6,6 @@ public final class CustomerMain {
     private CustomerMain() {}
 
     public static void main(String[] args) throws Exception {
-        ServiceHost.serve(new CustomerServiceImpl());
+        ServiceHost.serve(new CustomerServiceImpl(), args);
     }
 }
