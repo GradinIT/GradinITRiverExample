@@ -27,16 +27,10 @@ Skriptet gör samma steg och skriver loggarna till `target/demo-logs`. Motsvaran
 ```bash
 ./mvnw -B -U -DskipITs package
 DIST="$(cat integration-tests/target/river-dist-home.txt)"
-mkdir -p "$DIST/examples"
-cp customer-component/target/customer-component-1.0.0.jar \
-   order-component/target/order-component-1.0.0.jar \
-   "$DIST/examples/"
 "$DIST/bin/river-platform" --clean
 ```
 
-Supervisorn startar `mainClass` med samma klassökväg som `bin/river-platform`: `lib/*.jar` plus `examples/*.jar`. Utan kopian ovan saknas `CustomerMain` och instansen avslutas direkt.
-
-Vänta på `RIVER_PLATFORM_READY jini://host:port`. Fortsätt i en annan terminal. Sätt inte `JAVA_TOOL_OPTIONS`. `bin/river` läser `java -version`, och en `Picked up`-rad gör att den kontrollen faller.
+Vänta på `RIVER_PLATFORM_READY jini://host:port`. Fortsätt i en annan terminal. `bin/river deploy` lägger den deployade jar-filen, och jar-filer för komponenter den `depends` på, på barn-JVM:ens klassökväg. Delade bibliotek som inte ingår i komponenten läggs i distributionens `lib/ext` eller i `RIVER_EXTRA_CP`. Skripten hoppar över `Picked up JAVA_TOOL_OPTIONS` och `Picked up JDK_JAVA_OPTIONS` när de läser `java -version`.
 
 ```bash
 "$DIST/bin/river" deploy customer-component/target/customer-component-1.0.0.jar

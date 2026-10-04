@@ -8,7 +8,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,11 +25,12 @@ import org.junit.jupiter.api.Timeout;
  * failover onto another backend, then undeploys.
  *
  * <p>The platform script and the supervisor pass {@code --patch-module} and {@code --add-exports}.
- * This test does not put those flags in {@code JDK_JAVA_OPTIONS} or {@code JAVA_TOOL_OPTIONS}.
+ * This test does not put those flags in {@code JDK_JAVA_OPTIONS}. The dist scripts skip
+ * {@code Picked up JAVA_TOOL_OPTIONS} and {@code Picked up JDK_JAVA_OPTIONS} when they read
+ * {@code java -version}.
  *
- * <p>The child classpath is the distribution classpath: {@code lib/*.jar} plus {@code examples/*.jar}.
- * Deploy reads the SLA from the given jar, but the supervisor does not add that path. The jars are
- * copied into {@code examples/} before {@code bin/river-platform} starts.
+ * <p>Child JVMs get the deployed component jar and the jars of components it {@code depends} on.
+ * This test does not copy those jars into {@code examples/}.
  */
 class OrderPlatformIT {
     private static final Pattern READY = Pattern.compile("RIVER_PLATFORM_READY\\s+(jini://\\S+)");
@@ -74,15 +74,14 @@ class OrderPlatformIT {
         Path logs = repoRoot.resolve("integration-tests/target/platform-logs");
         Files.createDirectories(logs);
         Path platformLog = logs.resolve("platform.log");
-        installOnPlatformClasspath(distHome, customerJar, orderJar);
         platform = start(platformLog, distHome, Map.of(), command(platformBin, "--clean"));
         String locator = awaitReady(platform, platformLog, Duration.ofSeconds(120));
         assertNotNull(locator, "plattformen blev inte RIVER_PLATFORM_READY\n" + read(platformLog)
                 + "\n--- bin/river-platform ---\n" + scriptHead(platformBin));
         locator = usableLocator(locator);
 
-        // bin/river parses `java -version`. JAVA_TOOL_OPTIONS adds a "Picked up" line and the
-        // script then rejects the JDK. The client gets the locator with -D on its own command line.
+        // The client gets the locator with -D on its own command line. Do not put the activation
+        // flags in JDK_JAVA_OPTIONS; the supervisor already passes them to child JVMs.
         Map<String, String> lookupEnv = Map.of();
 
         CommandResult deployedCustomer = river(logs, distHome, riverBin, lookupEnv, "deploy", customerJar.toString());
@@ -147,14 +146,6 @@ class OrderPlatformIT {
             undeployCustomer = river(logs, distHome, riverBin, lookupEnv, "undeploy", customerJar.toString());
         }
         assertEquals(0, undeployCustomer.exit, undeployCustomer.output);
-    }
-
-    private static void installOnPlatformClasspath(Path distHome, Path... jars) throws IOException {
-        Path examples = distHome.resolve("examples");
-        Files.createDirectories(examples);
-        for (Path jar : jars) {
-            Files.copy(jar, examples.resolve(jar.getFileName()), StandardCopyOption.REPLACE_EXISTING);
-        }
     }
 
     private static Path distHome() throws IOException {

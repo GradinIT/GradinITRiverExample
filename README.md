@@ -41,14 +41,8 @@ Kräver JDK 25 eller senare, och läsrättighet till paketen på `https://maven.
 
 3. Starta en tom plattform i en terminal. Vänta på raden `RIVER_PLATFORM_READY jini://host:port`.
 
-   Barn-JVM:en får distributionens klassökväg: `lib/*.jar` och `examples/*.jar`. `bin/river deploy` läser SLA från jar-filen, men lägger inte den sökvägen på klassökvägen. Kopiera därför komponenterna till `examples/` innan plattformen startar.
-
    ```bash
    DIST="$(cat integration-tests/target/river-dist-home.txt)"
-   mkdir -p "$DIST/examples"
-   cp customer-component/target/customer-component-1.0.0.jar \
-      order-component/target/order-component-1.0.0.jar \
-      "$DIST/examples/"
    "$DIST/bin/river-platform" --clean
    ```
 
@@ -89,7 +83,7 @@ Enhetstesterna:
 ./mvnw -B -U verify
 ```
 
-`OrderPlatformIT` kör samma flöde, inklusive routing och failover. `./scripts/run-demo.sh` gör det också. Supervisorn skickar `--patch-module` och `--add-exports` till komponenternas barn-JVM. De flaggorna ska inte också ligga i `JDK_JAVA_OPTIONS`. Sätt inte `JAVA_TOOL_OPTIONS` när du kör `bin/river`: skriptet läser `java -version`, och raden `Picked up JAVA_TOOL_OPTIONS` gör att den kontrollen faller. Klienten får lookup-URL:en med `-Dse.gradinit.river.lookup`.
+`OrderPlatformIT` kör samma flöde, inklusive routing och failover. `./scripts/run-demo.sh` gör det också. `bin/river deploy` är det som lägger komponenten på barn-JVM:ens klassökväg, tillsammans med jar-filer för komponenter den `depends` på. Supervisorn skickar `--patch-module` och `--add-exports` till barn-JVM:en. De flaggorna ska inte också ligga i `JDK_JAVA_OPTIONS`. Skripten hoppar över raderna `Picked up JAVA_TOOL_OPTIONS` och `Picked up JDK_JAVA_OPTIONS` när de läser `java -version`. Klienten får lookup-URL:en med `-Dse.gradinit.river.lookup`.
 
 JVM-flaggorna `--patch-module java.rmi=...` och `--add-exports java.rmi/java.rmi.activation=ALL-UNNAMED` behövs för exempelklienten. `bin/river-platform` och `bin/river` sätter dem själva. Steg för steg finns i [docs/korning.md](docs/korning.md).
 
